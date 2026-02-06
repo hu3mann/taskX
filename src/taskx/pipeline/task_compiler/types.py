@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 @dataclass
 class PacketSource:
     """Source file citation."""
-    
+
     path: str  # Repo-relative
     heading_text: str | None = None
 
@@ -16,7 +16,7 @@ class PacketSource:
 @dataclass
 class TaskPacket:
     """A law-grade task packet."""
-    
+
     id: str  # e.g., TP_0001
     slug: str  # kebab-case
     title: str
@@ -35,7 +35,7 @@ class TaskPacket:
 @dataclass
 class TaskQueue:
     """Complete task queue output."""
-    
+
     schema_version: str
     pipeline_version: str
     generated_at: str

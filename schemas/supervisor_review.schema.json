@@ -1,0 +1,43 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Supervisor Review Schema",
+    "description": "Review decision by a supervisor regarding an implementation.",
+    "type": "object",
+    "required": [
+        "task_packet_id",
+        "decision",
+        "reasons",
+        "next_action"
+    ],
+    "properties": {
+        "task_packet_id": {
+            "type": "string"
+        },
+        "decision": {
+            "type": "string",
+            "enum": [
+                "accept",
+                "reject",
+                "revise"
+            ]
+        },
+        "reasons": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "next_action": {
+            "type": "string"
+        },
+        "gate_overrides": {
+            "type": "object"
+        },
+        "followup_packets": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        }
+    }
+}

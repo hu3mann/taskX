@@ -2,12 +2,12 @@
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from taskx.schemas.validator import validate_data
 from taskx.pipeline.spec_feedback.types import Evidence, Patch
+from taskx.schemas.validator import validate_data
 from taskx.utils.json_output import write_json_strict
 
 CHATX_VERSION = "0.1.0"
@@ -22,7 +22,7 @@ def generate_feedback(
     max_runs: int = 200,
 ) -> None:
     """Generate feedback artifacts from run summaries.
-    
+
     Args:
         run_paths: List of run directories containing RUN_SUMMARY.json
         task_queue_path: Path to TASK_QUEUE.json
@@ -53,7 +53,7 @@ def generate_feedback(
     generated_at = (
         "1970-01-01T00:00:00Z"
         if timestamp_mode == "deterministic"
-        else datetime.now(timezone.utc).isoformat()
+        else datetime.now(UTC).isoformat()
     )
 
     # Build patch document

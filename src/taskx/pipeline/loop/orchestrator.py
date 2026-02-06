@@ -1,14 +1,18 @@
 """Loop orchestrator - runs lifecycle stages A5→A6→A7→A8→A9."""
 
 import hashlib
-import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from rich.console import Console
+
+from taskx import __version__
+
 
 from taskx.pipeline.evidence.collector import collect_evidence
 from taskx.pipeline.loop.types import LoopInputs, StageResult
 from taskx.pipeline.spec_feedback.feedback import generate_feedback
+
 try:
     from taskx.spec_mining.miner import mine_spec
 except ImportError:
@@ -30,7 +34,7 @@ def run_loop(
     runs_path: Path | None = None,
 ) -> None:
     """Run the full lifecycle loop.
-    
+
     Args:
         loop_id: Unique loop identifier
         loop_dir: Root directory for this loop's outputs
@@ -106,15 +110,13 @@ def _run_mine_spec(
     stop: bool,
 ) -> StageResult:
     """Run A5 spec mining stage."""
-    stage_name = "mine_spec"
-    
+
     if stop:
         return _skipped_stage()
 
     started_at = _get_timestamp(timestamp_mode)
     out_dir = loop_dir / "spec_mine"
     outputs = []
-    error = None
 
     try:
         # Call A5 miner with default includes/excludes
@@ -285,10 +287,11 @@ def _run_task_workspace(
 
         # Call A7 runner
         create_run_workspace(
-            task_info=task_info,
+            task_packet_path=packet_file,
             run_id=run_id,
             output_dir=runs_dir,
             timestamp_mode=timestamp_mode,
+            pipeline_version=__version__,
         )
 
         # Collect outputs
@@ -428,10 +431,7 @@ def _run_spec_feedback(
 
     try:
         # Determine runs directory
-        if runs_path:
-            target_runs = runs_path
-        else:
-            target_runs = loop_dir / "runs"
+        target_runs = runs_path or loop_dir / "runs"
 
         if not target_runs.exists():
             raise FileNotFoundError(f"Runs directory not found: {target_runs}")
@@ -451,9 +451,8 @@ def _run_spec_feedback(
             raise FileNotFoundError(f"Task queue not found: {task_queue_path}")
 
         # Optional conflict ledger
-        conflict_ledger_path = loop_dir / "spec_mine" / "DESIGN_CONFLICT_LEDGER_V2.md"
-        if not conflict_ledger_path.exists():
-            conflict_ledger_path = None
+        _cl_path = loop_dir / "spec_mine" / "DESIGN_CONFLICT_LEDGER_V2.md"
+        conflict_ledger_path: Path | None = _cl_path if _cl_path.exists() else None
 
         # Call A9 feedback
         generate_feedback(
@@ -525,7 +524,7 @@ def _get_timestamp(mode: str) -> str:
     if mode == "deterministic":
         return "1970-01-01T00:00:00Z"
     else:
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
 
 def _compute_stage_hash(loop_dir: Path, outputs: list[str]) -> str:
@@ -549,12 +548,12 @@ def _compute_stage_hash(loop_dir: Path, outputs: list[str]) -> str:
 def _compute_loop_hash(stages: dict[str, StageResult]) -> str:
     """Compute aggregate loop hash from all stage hashes in fixed order."""
     stage_hashes = []
-    
+
     for stage_name in STAGE_ORDER:
         if stage_name in stages:
             stage_hash = stages[stage_name].hashes.get("stage_output_hash", "0" * 64)
             stage_hashes.append(stage_hash)
-    
+
     combined = "".join(stage_hashes)
     return hashlib.sha256(combined.encode()).hexdigest()
 
@@ -614,9 +613,9 @@ def _write_stage_log(
     stages: dict[str, StageResult],
 ) -> None:
     """Write human-readable stage log."""
-    lines = [f"# Loop Stage Log\n"]
+    lines = ["# Loop Stage Log\n"]
     lines.append(f"\n**Loop ID:** {loop_id}\n")
-    lines.append(f"\n## Inputs\n")
+    lines.append("\n## Inputs\n")
     lines.append(f"- Root: {inputs.root}\n")
     lines.append(f"- Mode: {inputs.mode}\n")
     lines.append(f"- Max packets: {inputs.max_packets}\n")
@@ -626,7 +625,7 @@ def _write_stage_log(
     lines.append(f"- Collect evidence: {inputs.collect_evidence}\n")
     lines.append(f"- Feedback: {inputs.feedback}\n")
 
-    lines.append(f"\n## Stages\n")
+    lines.append("\n## Stages\n")
 
     for stage_name in STAGE_ORDER:
         if stage_name in stages:
@@ -639,13 +638,13 @@ def _write_stage_log(
 
             lines.append(f"\n### {stage_name}\n")
             lines.append(f"**Status:** {status_icon} {result.status}\n")
-            
+
             if result.out_dir:
                 lines.append(f"**Output:** {result.out_dir}\n")
-            
+
             if result.outputs:
                 lines.append(f"**Files:** {len(result.outputs)}\n")
-            
+
             if result.error:
                 lines.append(f"**Error:** {result.error}\n")
 

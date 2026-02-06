@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from taskx.pipeline.task_runner.parser import parse_task_packet
-from taskx.pipeline.task_runner.types import TaskPacketInfo
 from taskx.utils.json_output import write_json_strict
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from taskx.pipeline.task_runner.types import TaskPacketInfo
 
 
 def create_run_workspace(
@@ -21,7 +25,7 @@ def create_run_workspace(
     dry_run: bool = False,
 ) -> dict[str, str]:
     """Create a structured run workspace for task packet execution.
-    
+
     Args:
         task_packet_path: Path to task packet markdown file
         output_dir: Base output directory for runs
@@ -29,31 +33,31 @@ def create_run_workspace(
         timestamp_mode: "deterministic" or "wallclock"
         pipeline_version: Pipeline version string
         dry_run: If True, don't write files, just return planned paths
-        
+
     Returns:
         Dict with paths to created artifacts
-        
+
     Raises:
         ValueError: If task packet is invalid
     """
     # Parse task packet
     packet_info = parse_task_packet(task_packet_path)
-    
+
     # Generate run_id if not provided
     if run_id is None:
         run_id = str(uuid.uuid4())
-    
+
     # Determine timestamp
     if timestamp_mode == "deterministic":
         generated_at = "1970-01-01T00:00:00Z"
     elif timestamp_mode == "wallclock":
-        generated_at = datetime.now(timezone.utc).isoformat()
+        generated_at = datetime.now(UTC).isoformat()
     else:
         raise ValueError(f"Invalid timestamp_mode: {timestamp_mode}")
-    
+
     # Create run directory
     run_dir = output_dir / run_id
-    
+
     if dry_run:
         # Just return planned paths
         return {
@@ -66,21 +70,21 @@ def create_run_workspace(
             "evidence": str(run_dir / "EVIDENCE.md"),
             "commands": str(run_dir / "COMMANDS.sh"),
         }
-    
+
     # Create directory
     run_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Copy task packet
     task_packet_dest = run_dir / "TASK_PACKET.md"
     task_packet_dest.write_bytes(task_packet_path.read_bytes())
-    
+
     # Generate workspace files
     _generate_plan(run_dir / "PLAN.md", packet_info, generated_at)
     _generate_checklist(run_dir / "CHECKLIST.md", packet_info)
     _generate_runlog(run_dir / "RUNLOG.md", packet_info, generated_at)
     _generate_evidence(run_dir / "EVIDENCE.md", packet_info)
     _generate_commands_script(run_dir / "COMMANDS.sh", packet_info)
-    
+
     # Build workspace file list (sorted)
     workspace_files = [
         {"path": "CHECKLIST.md", "purpose": "Execution checklist"},
@@ -91,7 +95,7 @@ def create_run_workspace(
         {"path": "RUNLOG.md", "purpose": "Execution log"},
         {"path": "TASK_PACKET.md", "purpose": "Original task packet"},
     ]
-    
+
     # Build envelope
     envelope_dict = {
         "schema_version": "1.0",
@@ -116,7 +120,7 @@ def create_run_workspace(
         },
         "notes": f"Run workspace for {packet_info.id}",
     }
-    
+
     # Write envelope
     envelope_path = run_dir / "RUN_ENVELOPE.json"
     write_json_strict(
@@ -124,7 +128,7 @@ def create_run_workspace(
         output_path=envelope_path,
         schema_name="run_envelope",
     )
-    
+
     return {
         "run_dir": str(run_dir),
         "envelope": str(envelope_path),
@@ -164,10 +168,10 @@ All changes must:
 The following files/paths are allowed for modification:
 
 """
-    
+
     for item in packet.allowlist:
         content += f"- `{item}`\n"
-    
+
     content += """
 ---
 
@@ -198,7 +202,7 @@ The following files/paths are allowed for modification:
 
 (Add implementation notes here as work progresses)
 """
-    
+
     path.write_text(content, encoding="utf-8")
 
 
@@ -237,7 +241,7 @@ def _generate_checklist(path: Path, packet: TaskPacketInfo) -> None:
 - [ ] All checklist items complete
 - [ ] Ready for review
 """
-    
+
     path.write_text(content, encoding="utf-8")
 
 
@@ -263,9 +267,9 @@ _[Brief summary of what was accomplished]_
 
 _[Detailed steps taken during implementation]_
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ---
 
@@ -293,7 +297,7 @@ _[Any unexpected behavior, decisions, or deviations from plan]_
 
 **Status:** _[success/partial/failed]_
 """
-    
+
     path.write_text(content, encoding="utf-8")
 
 
@@ -341,13 +345,13 @@ _[Summary of code changes made]_
 _[List of files modified, created, or deleted]_
 
 **Modified:**
-- 
+-
 
 **Created:**
-- 
+-
 
 **Deleted:**
-- 
+-
 
 ---
 
@@ -361,7 +365,7 @@ _[Test output and results]_
 # 10 passed
 ```
 """
-    
+
     path.write_text(content, encoding="utf-8")
 
 
@@ -371,10 +375,10 @@ def _generate_commands_script(path: Path, packet: TaskPacketInfo) -> None:
     content += "set -euo pipefail\n\n"
     content += f"# Verification commands for {packet.id}\n"
     content += f"# Task: {packet.title}\n\n"
-    
+
     for cmd in packet.verification_commands:
         content += f"{cmd}\n"
-    
+
     path.write_text(content, encoding="utf-8")
     # Make executable
     path.chmod(0o755)

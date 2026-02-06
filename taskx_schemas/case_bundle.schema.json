@@ -1,0 +1,79 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Case Bundle Schema",
+    "description": "Meta-layer contract for TaskX case ingestion and audit.",
+    "type": "object",
+    "required": [
+        "schema_version",
+        "case_id",
+        "generated_at",
+        "bundle_manifest",
+        "contents"
+    ],
+    "properties": {
+        "schema_version": {
+            "type": "string",
+            "const": "1.0"
+        },
+        "case_id": {
+            "type": "string",
+            "description": "Unique identifier for the case bundle"
+        },
+        "generated_at": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "bundle_manifest": {
+            "type": "object",
+            "required": [
+                "sha256",
+                "source_label",
+                "created_at"
+            ],
+            "properties": {
+                "sha256": {
+                    "type": "string",
+                    "description": "SHA256 hash of the bundle content"
+                },
+                "source_label": {
+                    "type": "string",
+                    "description": "Label identifying the source of the bundle"
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "taskx_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "contents": {
+            "type": "object",
+            "properties": {
+                "task_queue": {
+                    "type": "string",
+                    "description": "Path to task queue file"
+                },
+                "packets": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "List of paths to task packets"
+                },
+                "runs": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "List of paths to run directories"
+                },
+                "repo_snapshot": {
+                    "type": "string",
+                    "description": "Path to repo snapshot metadata"
+                },
+                "logs_index": {
+                    "type": "string",
+                    "description": "Path to logs index"
+                }
+            }
+        }
+    }
+}

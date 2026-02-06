@@ -8,7 +8,7 @@ from dataclasses import dataclass
 @dataclass
 class TaskPacketInfo:
     """Parsed task packet information."""
-    
+
     id: str
     title: str
     path: str
@@ -22,6 +22,6 @@ class TaskPacketInfo:
 @dataclass
 class RunWorkspace:
     """Run workspace information."""
-    
+
     root: str
     files: list[dict[str, str]]

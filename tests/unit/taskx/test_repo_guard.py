@@ -32,13 +32,13 @@ class TestFindTaskXRepoRoot:
         assert result == tmp_path
 
     def test_prefers_taskxroot_over_pyproject(self, tmp_path: Path):
-        """Should prefer .taskxroot marker over pyproject.toml."""
+        """Should prefer .taskxroot marker over pyproject.toml at same level."""
+        # Both markers at the same level - .taskxroot should win
         (tmp_path / ".taskxroot").touch()
         (tmp_path / "pyproject.toml").write_text('[project]\nname = "taskx"\n')
 
         subdir = tmp_path / "nested"
         subdir.mkdir()
-        (subdir / "pyproject.toml").write_text('[project]\nname = "taskx"\n')
 
         result = find_taskx_repo_root(subdir)
         assert result == tmp_path

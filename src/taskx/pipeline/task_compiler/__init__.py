@@ -2,9 +2,9 @@
 
 from taskx.pipeline.task_compiler.compiler import compile_task_queue
 from taskx.pipeline.task_compiler.types import (
+    PacketSource,
     TaskPacket,
     TaskQueue,
-    PacketSource,
 )
 
 __all__ = [

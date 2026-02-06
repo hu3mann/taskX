@@ -2,9 +2,10 @@
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 try:
     from taskx.schemas.message import CanonicalMessage
@@ -15,11 +16,11 @@ from taskx.schemas.validator import validate_data
 
 def write_messages_with_validation(messages: list[CanonicalMessage], output_path: Path) -> tuple[int, int]:
     """Write messages to JSON file with schema validation.
-    
+
     Args:
         messages: List of CanonicalMessage objects to write
         output_path: Path to output JSON file
-        
+
     Behavior:
         - Validates each message via Pydantic; invalid ones are written to a
           quarantine file (messages_bad.jsonl) and skipped from main output.
@@ -60,14 +61,14 @@ def write_messages_with_validation(messages: list[CanonicalMessage], output_path
                     "error": f"pydantic: {e}",
                 }) + "\n")
             bad_count += 1
-    
+
     # Write to file with pretty formatting
     output_data = {
         "messages": messages_data,
         "total_count": len(messages_data),
         "schema_version": "1.0"
     }
-    
+
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
 
@@ -125,11 +126,11 @@ def write_messages_jsonl_stream(
 
 def _redact_long_strings(data: Any, max_len: int = 256) -> Any:
     """Redact long strings in data structure for quarantine.
-    
+
     Args:
         data: Data to redact (dict, list, or primitive)
         max_len: Maximum string length before redaction
-        
+
     Returns:
         Redacted copy of data
     """
@@ -159,7 +160,7 @@ def quarantine_invalid_json(
     allow_raw: bool,
 ) -> Path:
     """Write invalid JSON to quarantine with metadata.
-    
+
     Args:
         data: Invalid data payload
         schema_name: Schema that validation failed against
@@ -168,35 +169,35 @@ def quarantine_invalid_json(
         run_id: Optional run ID for filename
         intended_path: Path where valid artifact would have been written
         allow_raw: If False, redact long strings to prevent data leaks
-        
+
     Returns:
         Path to quarantine file
     """
     quarantine_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Generate deterministic filename
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     run_part = run_id if run_id else "no_run"
     filename = f"{schema_name}__{run_part}__{timestamp}.json"
     quarantine_path = quarantine_dir / filename
-    
+
     # Redact data if needed
     quarantine_data = data if allow_raw else _redact_long_strings(data)
-    
+
     # Build quarantine record
     quarantine_record = {
         "schema_name": schema_name,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "run_id": run_id,
         "intended_path": str(intended_path),
         "error": str(error),
         "data": quarantine_data,
     }
-    
+
     # Write quarantine file
     with open(quarantine_path, "w", encoding="utf-8") as f:
         json.dump(quarantine_record, f, indent=2, ensure_ascii=False)
-    
+
     return quarantine_path
 
 
@@ -210,7 +211,7 @@ def write_json_strict(
     allow_raw_in_quarantine: bool = False,
 ) -> None:
     """Write JSON with strict schema validation and quarantine on failure.
-    
+
     Args:
         data: Dictionary to write as JSON
         output_path: Path to output file
@@ -218,7 +219,7 @@ def write_json_strict(
         run_id: Optional run ID for quarantine filename
         quarantine_dir: Directory for quarantine files (default: output_path.parent / "quarantine")
         allow_raw_in_quarantine: If True, allow raw data in quarantine; if False, redact long strings
-        
+
     Raises:
         RuntimeError: If validation fails (after quarantining)
     """
@@ -239,12 +240,12 @@ def write_json_strict(
             intended_path=output_path,
             allow_raw=allow_raw_in_quarantine,
         )
-        
+
         raise RuntimeError(
             f"Schema validation failed for {schema_name} at {output_path}. "
             f"Invalid data quarantined to {quarantine_path}"
         ) from e
-    
+
     # Write valid data
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
@@ -253,7 +254,7 @@ def write_json_strict(
 
 def write_json_with_validation(data: dict, output_path: Path, schema_name: str) -> None:
     """Write JSON to file with schema validation.
-    
+
     Legacy wrapper around write_json_strict for backward compatibility.
 
     Args:

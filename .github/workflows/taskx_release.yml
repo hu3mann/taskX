@@ -66,7 +66,24 @@ jobs:
       - name: Test wheel installation
         run: |
           bash scripts/taskx_install_test.sh
-      
+
+      - name: Smoke test from /tmp
+        run: |
+          # Create clean venv in /tmp
+          python3 -m venv /tmp/taskx-smoke-test
+          source /tmp/taskx-smoke-test/bin/activate
+
+          # Install wheel
+          pip install --quiet dist/*.whl
+
+          # Run doctor from /tmp (portable check)
+          cd /tmp
+          taskx doctor --timestamp-mode deterministic --require-git=false
+
+          # Cleanup
+          deactivate
+          rm -rf /tmp/taskx-smoke-test
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:

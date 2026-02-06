@@ -1,0 +1,84 @@
+{
+  "checks": {
+    "failed": 0,
+    "items": [
+      {
+        "id": "taskx_import",
+        "message": "TaskX imports successfully (version: 0.1.0)",
+        "remediation": [],
+        "status": "pass"
+      },
+      {
+        "id": "schema_registry",
+        "message": "Schema registry OK: 7 schemas available",
+        "remediation": [],
+        "status": "pass"
+      },
+      {
+        "id": "schema_load",
+        "message": "Schema loading and parsing works correctly",
+        "remediation": [],
+        "status": "pass"
+      },
+      {
+        "id": "repo_detection",
+        "message": "Repo detected at /Users/hue/code/taskX (via .git)",
+        "remediation": [],
+        "status": "pass"
+      },
+      {
+        "id": "git_availability",
+        "message": "Git is available and repository detected",
+        "remediation": [],
+        "status": "pass"
+      }
+    ],
+    "passed": 5,
+    "warnings": 0
+  },
+  "environment": {
+    "cwd": "/Users/hue/code/taskX",
+    "platform": "macOS-26.2-arm64-arm-64bit-Mach-O",
+    "python_version": "3.13.6"
+  },
+  "generated_at": "1970-01-01T00:00:00Z",
+  "git": {
+    "git_exe_found": true,
+    "git_repo_found": true,
+    "ok": true
+  },
+  "load_test": {
+    "name": "allowlist_diff",
+    "ok": true
+  },
+  "repo": {
+    "marker": ".git",
+    "project_root": null,
+    "repo_root": "/Users/hue/code/taskX"
+  },
+  "schema_version": "1.0",
+  "schemas": {
+    "available": [
+      "allowlist_diff",
+      "loop_envelope",
+      "promotion_token",
+      "run_envelope",
+      "run_summary",
+      "task_queue_patch",
+      "taskx_migration_plan"
+    ],
+    "missing": [],
+    "required": [
+      "allowlist_diff",
+      "promotion_token",
+      "run_envelope",
+      "run_summary"
+    ]
+  },
+  "status": "passed",
+  "taskx": {
+    "import_ok": true,
+    "version": "0.1.0"
+  },
+  "timestamp_mode": "deterministic"
+}

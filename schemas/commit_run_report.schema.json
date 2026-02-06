@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://taskx.dev/schemas/commit_run_report.schema.json",
+  "title": "TaskX Commit Run Report",
+  "description": "Report generated after attempting to create a git commit for a TaskX run",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "generated_at",
+    "run_dir",
+    "repo_root",
+    "git",
+    "allowlist",
+    "promotion",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Schema version for this report format",
+      "const": "1.0"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when report was generated (deterministic or wallclock)"
+    },
+    "timestamp_mode": {
+      "type": "string",
+      "enum": ["deterministic", "wallclock"],
+      "description": "Timestamp generation mode used"
+    },
+    "run_dir": {
+      "type": "string",
+      "description": "Absolute path to the run directory"
+    },
+    "repo_root": {
+      "type": "string",
+      "description": "Absolute path to the git repository root"
+    },
+    "git": {
+      "type": "object",
+      "required": ["branch", "head_before", "commit_created"],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "description": "Current git branch name"
+        },
+        "head_before": {
+          "type": "string",
+          "description": "Git commit SHA before operation"
+        },
+        "head_after": {
+          "type": ["string", "null"],
+          "description": "Git commit SHA after operation (null if no commit created)"
+        },
+        "commit_created": {
+          "type": "boolean",
+          "description": "Whether a commit was successfully created"
+        },
+        "commit_message": {
+          "type": ["string", "null"],
+          "description": "The commit message used (if commit created)"
+        }
+      }
+    },
+    "allowlist": {
+      "type": "object",
+      "required": ["allowed_files", "staged_files", "disallowed_files_detected"],
+      "properties": {
+        "allowed_files": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Files permitted by allowlist"
+        },
+        "staged_files": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Files actually staged for commit"
+        },
+        "disallowed_files_detected": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Modified files not in allowlist (violations)"
+        },
+        "violations_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of allowlist violations detected"
+        }
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "required": ["required", "found"],
+      "properties": {
+        "required": {
+          "type": "boolean",
+          "description": "Whether promotion was required for commit"
+        },
+        "found": {
+          "type": "boolean",
+          "description": "Whether promotion token was found"
+        },
+        "token_path": {
+          "type": ["string", "null"],
+          "description": "Path to promotion token file (if found)"
+        },
+        "token_id": {
+          "type": ["string", "null"],
+          "description": "Promotion token ID/hash (if found)"
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed"],
+      "description": "Overall status of commit operation"
+    },
+    "errors": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Error messages if operation failed"
+    }
+  }
+}

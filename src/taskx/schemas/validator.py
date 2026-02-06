@@ -18,15 +18,15 @@ def validate_data(
     strict: bool = True
 ) -> tuple[bool, list[str]]:
     """Validate data against a schema from package data.
-    
+
     Args:
         data: Data to validate (single dict or list of dicts)
         schema_name: Name of schema to validate against
         strict: If True, raise on validation errors; if False, return error list
-        
+
     Returns:
         Tuple of (is_valid, error_messages)
-        
+
     Raises:
         ImportError: If jsonschema not installed
         KeyError: If schema not found in package data
@@ -37,15 +37,15 @@ def validate_data(
             "jsonschema package required for validation.\n"
             "Install with: pip install jsonschema"
         )
-    
+
     # Load schema from package data (no CWD fallback)
     registry = get_registry()
     schema = registry.get_json(schema_name)
-    
+
     # Validate
     validator = Draft202012Validator(schema)
     errors = list(validator.iter_errors(data))
-    
+
     if errors:
         error_messages = [
             f"{'.'.join(str(p) for p in e.path)}: {e.message}"
@@ -53,13 +53,13 @@ def validate_data(
             else e.message
             for e in errors
         ]
-        
+
         if strict:
             raise ValueError(
                 f"Schema validation failed for '{schema_name}':\n" +
                 "\n".join(f"  - {msg}" for msg in error_messages)
             )
-        
+
         return False, error_messages
-    
+
     return True, []

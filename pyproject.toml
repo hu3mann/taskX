@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "taskx"
 version = "0.1.0"
 description = "TaskX - deterministic task-packet lifecycle + gates"
-readme = "README_TASKX_INSTALL.md"
+readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 authors = [{name = "Dopemux Contributors"}]
@@ -118,24 +118,29 @@ markers = [
     "perf: performance smoke tests (opt-in)",
 ]
 addopts = [
+    "-q",
     "--strict-markers",
     "--disable-warnings",
-    "--cov=src/taskx",
+    "--maxfail=1",
+    "--cov=taskx",
     "--cov-report=term-missing",
     "--cov-report=html",
-  # NOTE: This repo is still under active buildout; keep coverage reporting on,
-  # but do not hard-fail test runs on coverage until the codebase stabilizes.
-  "--cov-fail-under=0",
+    "--cov-fail-under=1",
 ]
 
 [tool.coverage.run]
-source = ["src/taskx"]
+branch = true
+source = ["taskx"]
+parallel = false
 omit = [
   "tests/*",
-  "src/taskx/__main__.py",
+  "*/taskx/__main__.py",
 ]
 
 [tool.coverage.report]
+skip_empty = false
+show_missing = true
+fail_under = 1
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
