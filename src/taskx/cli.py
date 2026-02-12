@@ -2678,6 +2678,87 @@ def project_doctor_cmd(
     raise typer.Exit(0)
 
 
+@project_app.command(name="upgrade")
+def project_upgrade_cmd(
+    repo_root: Path = typer.Option(
+        Path("."),
+        "--repo-root",
+        help="Repository root to upgrade/stabilize",
+    ),
+    instructions_path: Path = typer.Option(
+        Path(".taskx/instructions"),
+        "--instructions-path",
+        help="Instruction directory for project doctor --fix",
+    ),
+    mode: ProjectMode = typer.Option(
+        ProjectMode.BOTH,
+        "--mode",
+        help="Master mode: taskx, chatx, both, or none",
+    ),
+    shell: bool = typer.Option(
+        True,
+        "--shell/--no-shell",
+        help="Run project shell init",
+    ),
+    packs: bool = typer.Option(
+        True,
+        "--packs/--no-packs",
+        help="Run project doctor --fix for instruction packs",
+    ),
+    doctor: bool = typer.Option(
+        True,
+        "--doctor/--no-doctor",
+        help="Run taskx doctor after upgrade actions",
+    ),
+    allow_init_rails: bool = typer.Option(
+        False,
+        "--allow-init-rails",
+        help="Initialize missing .taskxroot/.taskx/project.json rails",
+    ),
+) -> None:
+    """Run deterministic project stabilization flow in one command."""
+    from taskx.project.upgrade import ProjectUpgradeRefusalError, run_project_upgrade
+
+    try:
+        report = run_project_upgrade(
+            repo_root=repo_root,
+            instructions_path=instructions_path,
+            mode=mode.value,
+            shell=shell,
+            packs=packs,
+            doctor=doctor,
+            allow_init_rails=allow_init_rails,
+        )
+    except ProjectUpgradeRefusalError as exc:
+        console.print(f"[bold red]{exc}[/bold red]")
+        raise typer.Exit(2) from exc
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] Project upgrade failed: {exc}")
+        raise typer.Exit(1) from exc
+
+    console.print(f"[green]✓ Project upgrade complete[/green] at {report['repo_root']}")
+    console.print(
+        f"[cyan]Rails:[/cyan] status={report['rails_state']['status']} "
+        f"project_id={report['rails_state']['project_id']}"
+    )
+
+    changes = report["file_changes"]
+    console.print(
+        f"[cyan]Changes:[/cyan] created={len(changes['created'])} "
+        f"modified={len(changes['modified'])} deleted={len(changes['deleted'])}"
+    )
+
+    if report.get("doctor") is not None:
+        console.print(
+            f"[cyan]Doctor:[/cyan] status={report['doctor']['status']} "
+            f"warnings={report['doctor']['checks']['warnings']}"
+        )
+
+    console.print(
+        f"[cyan]Report:[/cyan] {report['report_paths']['markdown']}, {report['report_paths']['json']}"
+    )
+
+
 @project_shell_app.command(name="init")
 def project_shell_init_cmd(
     repo_root: Path = typer.Option(
