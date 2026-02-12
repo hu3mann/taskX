@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+LOCAL_TASKX="$REPO_ROOT/.venv-taskx/bin/taskx"
+
+if [[ -x "$LOCAL_TASKX" ]]; then
+  exec "$LOCAL_TASKX" "$@"
+fi
+
+echo "WARNING: repo-local TaskX not found at $LOCAL_TASKX; falling back to taskx on PATH" >&2
+
+PATH_NO_LOCAL=""
+IFS=':' read -r -a PATH_PARTS <<< "$PATH"
+for PART in "${PATH_PARTS[@]}"; do
+  if [[ "$PART" == "$SCRIPT_DIR" ]]; then
+    continue
+  fi
+  if [[ -z "$PATH_NO_LOCAL" ]]; then
+    PATH_NO_LOCAL="$PART"
+  else
+    PATH_NO_LOCAL="$PATH_NO_LOCAL:$PART"
+  fi
+done
+
+GLOBAL_TASKX="$(PATH="$PATH_NO_LOCAL" command -v taskx || true)"
+if [[ -n "$GLOBAL_TASKX" ]]; then
+  exec "$GLOBAL_TASKX" "$@"
+fi
+
+echo "ERROR: could not find TaskX executable. Create .venv-taskx/bin/taskx or install taskx on PATH." >&2
+exit 2

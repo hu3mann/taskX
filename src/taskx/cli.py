@@ -2488,6 +2488,13 @@ project_mode_app = typer.Typer(
 )
 project_app.add_typer(project_mode_app, name="mode")
 
+project_shell_app = typer.Typer(
+    name="shell",
+    help="Repo-local shell wiring helpers",
+    no_args_is_help=True,
+)
+project_app.add_typer(project_shell_app, name="shell")
+
 
 @project_app.command(name="init")
 def project_init(
@@ -2669,6 +2676,76 @@ def project_doctor_cmd(
     if report["status"] == "fail":
         raise typer.Exit(2)
     raise typer.Exit(0)
+
+
+@project_shell_app.command(name="init")
+def project_shell_init_cmd(
+    repo_root: Path = typer.Option(
+        Path("."),
+        "--repo-root",
+        help="Repository root to initialize",
+    ),
+) -> None:
+    """Initialize repo-local shell wiring (.envrc + scripts/taskx shims)."""
+    from taskx.project.shell import init_shell
+
+    try:
+        report = init_shell(repo_root)
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] Project shell init failed: {exc}")
+        raise typer.Exit(1) from exc
+
+    console.print(f"[green]✓ Project shell initialized[/green] at {report['repo_root']}")
+    console.print(
+        f"[cyan]Created:[/cyan] {len(report['created_files'])} "
+        f"[cyan]Skipped:[/cyan] {len(report['skipped_files'])}"
+    )
+    for file_state in report["files"]:
+        marker = "[green]ok[/green]" if file_state["valid"] else "[yellow]needs-attention[/yellow]"
+        console.print(f"- {file_state['path']}: {marker}")
+    console.print(f"[cyan]Direnv found:[/cyan] {report['direnv_found']}")
+    console.print(
+        f"[cyan]Report:[/cyan] {report['report_paths']['markdown']}, {report['report_paths']['json']}"
+    )
+    console.print("[cyan]Next steps:[/cyan]")
+    for step in report["next_steps"]:
+        console.print(f"- {step}")
+
+
+@project_shell_app.command(name="status")
+def project_shell_status_cmd(
+    repo_root: Path = typer.Option(
+        Path("."),
+        "--repo-root",
+        help="Repository root to inspect",
+    ),
+) -> None:
+    """Report repo-local shell wiring status."""
+    from taskx.project.shell import status_shell
+
+    try:
+        report = status_shell(repo_root)
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] Project shell status failed: {exc}")
+        raise typer.Exit(1) from exc
+
+    console.print(f"[cyan]Repo:[/cyan] {report['repo_root']}")
+    for file_state in report["files"]:
+        exists = "present" if file_state["exists"] else "missing"
+        if file_state["valid"]:
+            state = "[green]valid[/green]"
+        elif file_state["exists"]:
+            state = "[yellow]present-but-invalid[/yellow]"
+        else:
+            state = "[yellow]missing[/yellow]"
+        console.print(f"- {file_state['path']}: {exists}, {state}")
+    console.print(f"[cyan]Direnv found:[/cyan] {report['direnv_found']}")
+    console.print(
+        f"[cyan]Report:[/cyan] {report['report_paths']['markdown']}, {report['report_paths']['json']}"
+    )
+    console.print("[cyan]Next steps:[/cyan]")
+    for step in report["next_steps"]:
+        console.print(f"- {step}")
 
 
 # Bundle Commands
