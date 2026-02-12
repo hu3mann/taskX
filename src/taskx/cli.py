@@ -100,6 +100,19 @@ cli = typer.Typer(
 console = Console()
 
 
+class DirtyPolicy(str, Enum):
+    """Dirty working tree handling policy for deterministic commands."""
+
+    REFUSE = "refuse"
+    STASH = "stash"
+
+
+class FinishMode(str, Enum):
+    """Supported finish strategies."""
+
+    REBASE_FF = "rebase-ff"
+
+
 @cli.callback(invoke_without_command=True)
 def _cli_callback(ctx: typer.Context) -> None:
     """
@@ -1169,6 +1182,175 @@ def loop(
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         raise typer.Exit(1)
+
+
+# ============================================================================
+# Worktree + Commit Sequencing Commands
+# ============================================================================
+
+wt_app = typer.Typer(
+    name="wt",
+    help="Worktree lifecycle commands for deterministic packet execution",
+    no_args_is_help=True,
+)
+cli.add_typer(wt_app, name="wt")
+
+
+@wt_app.command(name="start")
+def wt_start(
+    run: Path = typer.Option(
+        ...,
+        "--run",
+        help="Run directory for this Task Packet execution",
+    ),
+    branch: str | None = typer.Option(
+        None,
+        "--branch",
+        help="Task branch name (default inferred from run directory)",
+    ),
+    base: str = typer.Option(
+        "main",
+        "--base",
+        help="Base branch to branch from",
+    ),
+    remote: str = typer.Option(
+        "origin",
+        "--remote",
+        help="Remote used for base branch fetch",
+    ),
+    worktree_path: Path | None = typer.Option(
+        None,
+        "--worktree-path",
+        help="Explicit worktree path (default under out/worktrees)",
+    ),
+    dirty_policy: DirtyPolicy = typer.Option(
+        DirtyPolicy.REFUSE,
+        "--dirty-policy",
+        help="Dirty state policy: refuse or stash",
+    ),
+) -> None:
+    """Create an isolated worktree + task branch for a Task Packet run.
+    All packet commits must occur inside this worktree.
+    Refuses to operate on a dirty repository unless --dirty-policy stash is provided.
+    """
+    from taskx.git.worktree_ops import start_worktree
+
+    try:
+        result = start_worktree(
+            run_dir=run,
+            branch=branch,
+            base=base,
+            remote=remote,
+            worktree_path=worktree_path,
+            dirty_policy=dirty_policy.value,
+            cwd=Path.cwd(),
+        )
+    except RuntimeError as exc:
+        console.print(str(exc))
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(1) from exc
+
+    console.print("[green]✓ Worktree initialized[/green]")
+    console.print(f"[cyan]Branch:[/cyan] {result['branch']}")
+    console.print(f"[cyan]Worktree:[/cyan] {result['worktree_path']}")
+    console.print(f"[cyan]Artifact:[/cyan] {Path(result['run_dir']) / 'WORKTREE.json'}")
+
+
+@cli.command(name="commit-sequence")
+def commit_sequence_cmd(
+    run: Path = typer.Option(
+        ...,
+        "--run",
+        help="Run directory containing TASK_PACKET.md and artifacts",
+    ),
+    allow_unpromoted: bool = typer.Option(
+        False,
+        "--allow-unpromoted",
+        help="Allow commit sequence without promotion token",
+    ),
+    dirty_policy: DirtyPolicy = typer.Option(
+        DirtyPolicy.REFUSE,
+        "--dirty-policy",
+        help="Dirty state policy: refuse or stash",
+    ),
+) -> None:
+    """Execute the COMMIT PLAN defined in the Task Packet.
+    Creates one commit per step, staging only allowlisted changed files.
+    Refuses to run on main branch.
+    Refuses if index contains pre-staged changes.
+    """
+    from taskx.git.worktree_ops import commit_sequence
+
+    try:
+        report = commit_sequence(
+            run_dir=run,
+            allow_unpromoted=allow_unpromoted,
+            dirty_policy=dirty_policy.value,
+            cwd=Path.cwd(),
+        )
+    except RuntimeError as exc:
+        console.print(str(exc))
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(1) from exc
+
+    console.print("[green]✓ Commit sequence complete[/green]")
+    console.print(f"[cyan]Commits:[/cyan] {len(report.get('steps', []))}")
+    console.print(f"[cyan]Artifact:[/cyan] {run.resolve() / 'COMMIT_SEQUENCE_RUN.json'}")
+
+
+@cli.command(name="finish")
+def finish_cmd(
+    run: Path = typer.Option(
+        ...,
+        "--run",
+        help="Run directory for this Task Packet execution",
+    ),
+    mode: FinishMode = typer.Option(
+        FinishMode.REBASE_FF,
+        "--mode",
+        help="Finish mode (default: rebase-ff)",
+    ),
+    cleanup: bool = typer.Option(
+        True,
+        "--cleanup/--no-cleanup",
+        help="Remove task worktree and branch after successful finish",
+    ),
+    dirty_policy: DirtyPolicy = typer.Option(
+        DirtyPolicy.REFUSE,
+        "--dirty-policy",
+        help="Dirty state policy: refuse or stash",
+    ),
+) -> None:
+    """Finalize a Task Packet run.
+    Rebases task branch onto origin/main, fast-forwards main,
+    pushes to remote, verifies sync, and optionally cleans up.
+    """
+    from taskx.git.worktree_ops import finish_run
+
+    try:
+        report = finish_run(
+            run_dir=run,
+            mode=mode.value,
+            cleanup=cleanup,
+            dirty_policy=dirty_policy.value,
+            cwd=Path.cwd(),
+        )
+    except RuntimeError as exc:
+        console.print(str(exc))
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(1) from exc
+
+    console.print("[green]✓ Finish complete[/green]")
+    console.print(f"[cyan]Branch:[/cyan] {report['branch']}")
+    console.print(f"[cyan]main after merge:[/cyan] {report['main_after_merge']}")
+    console.print(f"[cyan]remote after push:[/cyan] {report['remote_after_push']}")
+    console.print(f"[cyan]Artifact:[/cyan] {run.resolve() / 'FINISH.json'}")
 
 
 # ============================================================================
