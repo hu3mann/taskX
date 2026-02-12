@@ -50,6 +50,24 @@ Reports are written to:
 
 If `.envrc` exists but `direnv` is missing, `taskx doctor` emits a warning (non-failing).
 
+### One-Command Repo Stabilization (`project upgrade`)
+
+TaskX can run shell wiring, instruction pack repair, and doctor checks in one deterministic command:
+
+```bash
+taskx project upgrade --repo-root . --allow-init-rails
+```
+
+Default behavior:
+- Validates identity rails (`.taskxroot`, `.taskx/project.json`)
+- Runs `project shell init`
+- Runs `project doctor --fix --mode both` on `.taskx/instructions`
+- Runs `taskx doctor`
+
+Reports are written to:
+- `out/taskx_project_upgrade/PROJECT_UPGRADE_REPORT.json`
+- `out/taskx_project_upgrade/PROJECT_UPGRADE_REPORT.md`
+
 ### Dev Note: Multiple TaskX Installs
 
 If `taskx` on `PATH` points to a different install than this checkout, run commands from this repo with:
