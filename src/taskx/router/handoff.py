@@ -113,8 +113,8 @@ def render_handoff_markdown(plan: RoutePlan) -> str:
 def _codex_prompt(step: str, model: str | None) -> str:
     selected_model = model or "unspecified"
     return (
-        f"Model: {selected_model}\\n"
-        f"Execute TaskX step `{step}` in assisted mode.\\n"
+        f"Model: {selected_model}\n"
+        f"Execute TaskX step `{step}` in assisted mode.\n"
         "Do not run external runners. Produce deterministic artifacts only."
     )
 
@@ -122,8 +122,8 @@ def _codex_prompt(step: str, model: str | None) -> str:
 def _claude_prompt(step: str, model: str | None) -> str:
     selected_model = model or "unspecified"
     return (
-        f"Model: {selected_model}\\n"
-        f"Implement TaskX step `{step}` using the packet instructions.\\n"
+        f"Model: {selected_model}\n"
+        f"Implement TaskX step `{step}` using the packet instructions.\n"
         "Print commands/prompts only for handoff, no background execution."
     )
 
