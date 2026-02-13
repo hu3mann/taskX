@@ -101,20 +101,23 @@ def load_availability(repo_root: Path) -> AvailabilityConfig:
             f"Missing availability config at {path}. Run `taskx route init --repo-root {repo_root}` first."
         )
 
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise AvailabilityError(f"availability.yaml parse error: {exc}") from exc
     if not isinstance(raw, dict):
-        raise AvailabilityError("availability.yaml must be a mapping at top level")
+        raise AvailabilityError("availability.yaml parse error: expected mapping at top level")
 
     models_raw = raw.get("models")
     runners_raw = raw.get("runners")
     policy_raw = raw.get("policy")
 
     if not isinstance(models_raw, dict) or not models_raw:
-        raise AvailabilityError("availability.yaml requires non-empty `models` mapping")
+        raise AvailabilityError("availability.yaml missing required non-empty `models` mapping")
     if not isinstance(runners_raw, dict) or not runners_raw:
-        raise AvailabilityError("availability.yaml requires non-empty `runners` mapping")
+        raise AvailabilityError("availability.yaml missing required non-empty `runners` mapping")
     if not isinstance(policy_raw, dict):
-        raise AvailabilityError("availability.yaml requires `policy` mapping")
+        raise AvailabilityError("availability.yaml missing required `policy` mapping")
 
     models: dict[str, ModelSpec] = {}
     for model_name in sorted(models_raw):
@@ -219,3 +222,12 @@ def _normalize_string_list_preserve_order(value: Any, field_name: str) -> list[s
             normalized.append(cleaned)
 
     return normalized
+
+
+DEFAULT_ROUTE_POLICY = _normalize_policy(AVAILABILITY_CONFIG_TEMPLATE["policy"])
+
+
+def default_route_policy() -> RoutePolicy:
+    """Return the deterministic default route policy."""
+
+    return DEFAULT_ROUTE_POLICY

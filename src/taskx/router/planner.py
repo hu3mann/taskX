@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from taskx.router.availability import load_availability
+from taskx.router.availability import (
+    AvailabilityError,
+    availability_path_for_repo,
+    default_route_policy,
+    load_availability,
+)
 from taskx.router.scoring import score_step_candidates, score_to_confidence
 from taskx.router.types import DEFAULT_STEPS, PlannedStep, RoutePlan, TopCandidate
 
@@ -70,11 +75,21 @@ def build_route_plan(
     """Build deterministic plan for packet + steps."""
     resolved_repo_root = repo_root.resolve()
     resolved_packet = packet_path.resolve()
-    availability = load_availability(resolved_repo_root)
+    planned_steps = tuple(steps or DEFAULT_STEPS)
+    availability_path = availability_path_for_repo(resolved_repo_root)
 
-    planned_steps = steps or DEFAULT_STEPS
+    try:
+        availability = load_availability(resolved_repo_root)
+    except AvailabilityError as exc:
+        return _route_plan_from_availability_failure(
+            repo_root=resolved_repo_root,
+            packet_path=resolved_packet,
+            availability_path=availability_path,
+            steps=planned_steps,
+            refusal_reason=str(exc),
+        )
+
     hints = extract_router_hints(resolved_packet)
-
     decisions: list[PlannedStep] = []
     refusal_reasons: list[str] = []
 
@@ -132,7 +147,8 @@ def build_route_plan(
             )
         )
 
-    status = "refused" if refusal_reasons else "ok"
+    unique_reasons = tuple(dict.fromkeys(refusal_reasons))
+    status = "refused" if unique_reasons else "ok"
     return RoutePlan(
         status=status,
         repo_root=resolved_repo_root,
@@ -140,7 +156,46 @@ def build_route_plan(
         availability_path=availability.path,
         policy=availability.policy,
         steps=tuple(decisions),
-        refusal_reasons=tuple(sorted(set(refusal_reasons))),
+        refusal_reasons=unique_reasons,
+    )
+
+
+def _route_plan_from_availability_failure(
+    *,
+    repo_root: Path,
+    packet_path: Path,
+    availability_path: Path,
+    steps: tuple[str, ...],
+    refusal_reason: str,
+) -> RoutePlan:
+    """Return a refused plan artifact when availability cannot be loaded."""
+    return RoutePlan(
+        status="refused",
+        repo_root=repo_root,
+        packet_path=packet_path,
+        availability_path=availability_path,
+        policy=default_route_policy(),
+        steps=tuple(_empty_step(step_name) for step_name in steps),
+        refusal_reasons=(refusal_reason,),
+    )
+
+
+def _empty_step(step_name: str) -> PlannedStep:
+    """Create a deterministic placeholder for a step when routing is refused."""
+    return PlannedStep(
+        step=step_name,
+        runner=None,
+        model=None,
+        confidence=0.0,
+        scores={
+            "runner_fit": 0,
+            "model_fit": 0,
+            "cost_penalty": 0,
+            "confidence_penalty": 0,
+            "total": 0,
+        },
+        reasons=(),
+        candidates_top3=(),
     )
 
 
