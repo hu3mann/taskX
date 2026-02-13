@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import pathlib
 import subprocess
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from typer.testing import CliRunner
@@ -96,7 +97,7 @@ def test_wt_start_stash_logs_repo_root_dirt(tmp_path: Path, monkeypatch) -> None
             "--run",
             str(run_dir),
             "--branch",
-            "tp/0101-feature",
+            "tp/taskx.core/0101-feature",
             "--dirty-policy",
             "stash",
         ],
@@ -104,7 +105,7 @@ def test_wt_start_stash_logs_repo_root_dirt(tmp_path: Path, monkeypatch) -> None
     assert result.exit_code == 0
 
     worktree = _load_worktree_json(run_dir)
-    assert (tmp_path / "workspace" / "repo" / "out" / "worktrees" / "tp_0101_feature").exists()
+    assert Path(worktree["worktree_path"]).exists()
     dirty_state = _load_dirty_state(run_dir)
     assert len(dirty_state) == 1
     entry = dirty_state[0]
@@ -114,7 +115,7 @@ def test_wt_start_stash_logs_repo_root_dirt(tmp_path: Path, monkeypatch) -> None
     assert entry["status_porcelain"] == sorted(entry["status_porcelain"])
     assert any("README.md" in line for line in entry["status_porcelain"])
     assert any("notes.txt" in line for line in entry["status_porcelain"])
-    assert worktree["branch"] == "tp/0101-feature"
+    assert worktree["branch"] == "tp/taskx.core/0101-feature"
 
 
 def test_commit_sequence_stash_only_disallowed_changes(tmp_path: Path, monkeypatch) -> None:
