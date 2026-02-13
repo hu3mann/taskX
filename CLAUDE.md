@@ -139,7 +139,17 @@ REVIEW / COMMIT:
 - **No `datetime.now()`**: Use `timestamp_mode="deterministic"` for release builds
 - **Token-gated commits**: Cannot commit without a promotion token from gate-allowlist pass
 
-## 9) Response format (mandatory)
+## 9) New Command Surfaces
+
+- `taskx project shell init|status`
+- `taskx project upgrade`
+- `taskx route init|plan|handoff|explain`
+- `taskx pr open`
+
+Branch restore contract:
+- If a TaskX command switches branches, it must restore original branch/HEAD unless explicitly disabled.
+
+## 10) Response format (mandatory)
 A) MODE + attention state
 B) PLAN
 C) CHANGES

@@ -37,3 +37,12 @@ C) CHANGES (files)
 D) COMMANDS RUN + RESULTS
 E) CONPORT LOGGING (logged / should log)
 F) NEXT ACTION or CHECKPOINT STOP
+
+## 6) New Command Surfaces
+- `taskx project shell init|status`
+- `taskx project upgrade`
+- `taskx route init|plan|handoff|explain`
+- `taskx pr open`
+
+Branch restore contract:
+- If a TaskX command switches branches, it must restore original branch/HEAD unless explicitly disabled.
