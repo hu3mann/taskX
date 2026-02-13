@@ -6,6 +6,7 @@ import json
 import re
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,9 @@ class PrOpenRefusal(RuntimeError):
     """Raised when PR open flow must refuse with exit code 2."""
 
 
+LlmRefreshRunner = Callable[[Path], dict[str, Any]]
+
+
 def run_pr_open(
     *,
     repo_root: Path,
@@ -38,6 +42,10 @@ def run_pr_open(
     allow_dirty: bool,
     allow_detached: bool,
     allow_base_branch: bool,
+    require_branch_prefix: str,
+    allow_branch_prefix_override: bool,
+    refresh_llm: bool,
+    refresh_llm_runner: LlmRefreshRunner | None = None,
 ) -> dict[str, Any]:
     """Execute assisted PR open flow with deterministic report artifacts."""
     resolved_repo = repo_root.resolve()
@@ -48,7 +56,7 @@ def run_pr_open(
 
     state: GitState | None = None
     report: dict[str, Any] = {
-        "status": "failed",
+        "status": "error",
         "repo_root": str(resolved_repo),
         "title": title,
         "body_file": str(resolved_body),
@@ -59,17 +67,30 @@ def run_pr_open(
         "allow_dirty": allow_dirty,
         "allow_detached": allow_detached,
         "allow_base_branch": allow_base_branch,
+        "require_branch_prefix": require_branch_prefix,
+        "allow_branch_prefix_override": allow_branch_prefix_override,
+        "refresh_llm": refresh_llm,
         "push_command": "",
         "pr_command": "",
+        "pr_method": None,
         "pr_url": None,
         "fallback_url": None,
+        "remote_url_raw": None,
+        "remote_url_normalized": None,
         "refusal_reason": None,
         "error": None,
         "captured_state": None,
         "restored_state": False,
         "branch_used": None,
         "head_sha": None,
+        "llm_refresh": {
+            "ran": False,
+            "status": "skipped",
+            "report_paths": None,
+        },
     }
+    pending_error: Exception | None = None
+    restore_error: str | None = None
 
     try:
         state = preflight_or_refuse(
@@ -79,6 +100,8 @@ def run_pr_open(
                 allow_detached=allow_detached,
                 allow_base_branch=allow_base_branch,
                 base_branch=base,
+                require_branch_prefix=require_branch_prefix,
+                allow_branch_prefix_override=allow_branch_prefix_override,
             ),
         )
         report["captured_state"] = {
@@ -98,6 +121,33 @@ def run_pr_open(
 
         report["branch_used"] = branch
         assert branch is not None
+
+        if refresh_llm:
+            if refresh_llm_runner is None:
+                raise RuntimeError("refresh-llm was requested but no runner callback was provided")
+            refresh_report = refresh_llm_runner(resolved_repo)
+            refresh_status = str(refresh_report.get("status", "ok"))
+            report["llm_refresh"] = {
+                "ran": True,
+                "status": refresh_status,
+                "report_paths": {
+                    "json": str(resolved_repo / "out" / "taskx_docs_refresh_llm" / "DOCS_REFRESH_LLM_REPORT.json"),
+                    "md": str(resolved_repo / "out" / "taskx_docs_refresh_llm" / "DOCS_REFRESH_LLM_REPORT.md"),
+                },
+            }
+            if refresh_status == "refused":
+                raise PrOpenRefusal("Refused: docs refresh-llm reported refusal.")
+            if refresh_status not in {"ok", "drift"}:
+                raise RuntimeError(f"docs refresh-llm failed with status `{refresh_status}`")
+
+        remote_url = _git_output(resolved_repo, ["remote", "get-url", remote])
+        report["remote_url_raw"] = remote_url
+        owner_repo = _parse_owner_repo(remote_url)
+        if owner_repo is None:
+            raise PrOpenRefusal(f"Refused: cannot derive owner/repo from remote URL `{remote_url}`")
+        report["remote_url_normalized"] = owner_repo
+        fallback_url = f"https://github.com/{owner_repo}/pull/new/{branch}"
+        report["fallback_url"] = fallback_url
 
         push_cmd = _build_push_command(resolved_repo, remote=remote, branch=branch)
         report["push_command"] = " ".join(push_cmd)
@@ -121,39 +171,51 @@ def run_pr_open(
             if draft:
                 pr_cmd.append("--draft")
             report["pr_command"] = " ".join(pr_cmd)
+            report["pr_method"] = "gh"
             created = _run(pr_cmd, cwd=resolved_repo)
-            report["pr_url"] = _extract_pr_url(created.stdout)
-            if report["pr_url"] is None:
-                raise RuntimeError("gh pr create succeeded but did not return a PR URL")
+            report["pr_url"] = _extract_pr_url(created.stdout) or fallback_url
         else:
-            remote_url = _git_output(resolved_repo, ["remote", "get-url", remote])
-            owner_repo = _parse_owner_repo(remote_url)
-            if owner_repo is None:
-                raise PrOpenRefusal(f"Refused: cannot derive owner/repo from remote URL `{remote_url}`")
-            fallback_url = f"https://github.com/{owner_repo}/pull/new/{branch}"
-            report["fallback_url"] = fallback_url
             report["pr_url"] = fallback_url
             report["pr_command"] = "fallback-url"
+            report["pr_method"] = "fallback-url"
 
         report["status"] = "ok"
     except PreflightRefusal as exc:
         report["status"] = "refused"
         report["refusal_reason"] = str(exc)
-        raise PrOpenRefusal(str(exc)) from exc
+        pending_error = PrOpenRefusal(str(exc))
     except PrOpenRefusal as exc:
         report["status"] = "refused"
         report["refusal_reason"] = str(exc)
-        raise
+        pending_error = exc
     except Exception as exc:
-        report["status"] = "failed"
+        report["status"] = "error"
         report["error"] = str(exc)
-        raise
+        pending_error = exc
     finally:
         if restore_branch and state is not None:
-            restore_git_state(resolved_repo, state)
-            report["restored_state"] = True
+            try:
+                restore_git_state(resolved_repo, state)
+                report["restored_state"] = True
+            except Exception as exc:  # pragma: no cover - defensive path
+                restore_error = str(exc)
+                report["restored_state"] = False
+
+        if restore_error:
+            report["status"] = "error"
+            if report.get("error"):
+                report["error"] = f"{report['error']} | restore failed: {restore_error}"
+            else:
+                report["error"] = f"restore failed: {restore_error}"
 
         _write_reports(resolved_repo, report)
+
+    if restore_error and pending_error is not None:
+        raise RuntimeError(f"{pending_error} | restore failed: {restore_error}") from pending_error
+    if restore_error:
+        raise RuntimeError(f"restore failed: {restore_error}")
+    if pending_error is not None:
+        raise pending_error
 
     return report
 
@@ -242,7 +304,9 @@ def _render_markdown_report(report: dict[str, Any]) -> str:
         f"- branch_used: {report['branch_used']}",
         f"- restore_branch: {report['restore_branch']}",
         f"- restored_state: {report['restored_state']}",
+        f"- pr_method: {report['pr_method']}",
         f"- pr_url: {report['pr_url']}",
+        f"- fallback_url: {report['fallback_url']}",
         "",
         "## Commands",
         "",
@@ -255,6 +319,22 @@ def _render_markdown_report(report: dict[str, Any]) -> str:
 
     if report.get("error"):
         lines.extend(["", "## Error", "", f"- {report['error']}"])
+
+    llm_refresh = report.get("llm_refresh")
+    if isinstance(llm_refresh, dict):
+        lines.extend(
+            [
+                "",
+                "## LLM Refresh",
+                "",
+                f"- ran: {llm_refresh.get('ran')}",
+                f"- status: {llm_refresh.get('status')}",
+            ]
+        )
+        report_paths = llm_refresh.get("report_paths")
+        if isinstance(report_paths, dict):
+            lines.append(f"- report_json: {report_paths.get('json')}")
+            lines.append(f"- report_md: {report_paths.get('md')}")
 
     lines.append("")
     return "\n".join(lines)

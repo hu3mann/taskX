@@ -1910,11 +1910,34 @@ def pr_open(
         "--allow-base-branch",
         help="Allow running from base branch (default refuses)",
     ),
+    refresh_llm: bool = typer.Option(
+        False,
+        "--refresh-llm/--no-refresh-llm",
+        help="Run docs refresh-llm before push/PR and include result in report",
+    ),
+    require_branch_prefix: str = typer.Option(
+        "codex/tp-pr-open-branch-guard",
+        "--require-branch-prefix",
+        help="Required branch prefix for branch isolation guard",
+    ),
+    allow_branch_prefix_override: bool = typer.Option(
+        False,
+        "--allow-branch-prefix-override",
+        help="Allow bypassing branch prefix guard",
+    ),
 ) -> None:
     """Open PR in assisted mode with restore rails and deterministic reports."""
     resolved_repo = repo_root.resolve()
     resolved_body = body_file if body_file.is_absolute() else (resolved_repo / body_file)
     resolved_body = resolved_body.resolve()
+
+    def _refresh_runner(root: Path) -> dict[str, Any]:
+        from taskx.docs.refresh_llm import MarkerStructureError, run_refresh_llm
+
+        try:
+            return run_refresh_llm(repo_root=root, cli_app=cli, check=False)
+        except MarkerStructureError as exc:
+            raise PrOpenRefusal("Refused: Invalid AUTOGEN marker structure") from exc
 
     try:
         report = run_pr_open(
@@ -1928,6 +1951,10 @@ def pr_open(
             allow_dirty=allow_dirty,
             allow_detached=allow_detached,
             allow_base_branch=allow_base_branch,
+            require_branch_prefix=require_branch_prefix,
+            allow_branch_prefix_override=allow_branch_prefix_override,
+            refresh_llm=refresh_llm,
+            refresh_llm_runner=_refresh_runner if refresh_llm else None,
         )
     except PrOpenRefusal as exc:
         console.print(f"[yellow]{exc}[/yellow]")

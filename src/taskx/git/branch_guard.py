@@ -31,6 +31,8 @@ class PreflightFlags:
     allow_detached: bool
     allow_base_branch: bool
     base_branch: str
+    require_branch_prefix: str
+    allow_branch_prefix_override: bool
 
 
 def _run_git(repo_root: Path, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -58,6 +60,24 @@ def capture_git_state(repo_root: Path) -> GitState:
     return GitState(mode="branch", branch=branch, head_sha=head_sha)
 
 
+def current_branch(repo_root: Path) -> str | None:
+    """Return the current branch name, or None when detached."""
+    branch = _run_git(repo_root.resolve(), ["rev-parse", "--abbrev-ref", "HEAD"], check=True).stdout.strip()
+    if branch == "HEAD":
+        return None
+    return branch or None
+
+
+def is_dirty(repo_root: Path) -> bool:
+    """Return True when repository has tracked or untracked changes."""
+    status = _run_git(
+        repo_root.resolve(),
+        ["status", "--porcelain", "--untracked-files=all"],
+        check=True,
+    ).stdout.strip()
+    return bool(status)
+
+
 def restore_git_state(repo_root: Path, state: GitState) -> None:
     """Restore checkout to captured state."""
     resolved = repo_root.resolve()
@@ -73,15 +93,13 @@ def restore_git_state(repo_root: Path, state: GitState) -> None:
 def preflight_or_refuse(repo_root: Path, flags: PreflightFlags) -> GitState:
     """Validate repo state against refusal rails and return captured state."""
     resolved = repo_root.resolve()
-    state = capture_git_state(resolved)
+    try:
+        state = capture_git_state(resolved)
+        dirty = is_dirty(resolved)
+    except RuntimeError as exc:
+        raise PreflightRefusal("Refused: invalid repo root or not a git repository.") from exc
 
-    status = _run_git(
-        resolved,
-        ["status", "--porcelain", "--untracked-files=all"],
-        check=True,
-    ).stdout.strip()
-
-    if status and not flags.allow_dirty:
+    if dirty and not flags.allow_dirty:
         raise PreflightRefusal("Refused: repository working tree is dirty (use --allow-dirty to override).")
 
     if state.mode == "detached" and not flags.allow_detached:
@@ -91,6 +109,20 @@ def preflight_or_refuse(repo_root: Path, flags: PreflightFlags) -> GitState:
         raise PreflightRefusal(
             f"Refused: current branch is base branch `{flags.base_branch}` "
             "(use --allow-base-branch to override)."
+        )
+
+    required_prefix = flags.require_branch_prefix.strip()
+    if (
+        required_prefix
+        and state.mode == "branch"
+        and state.branch is not None
+        and not state.branch.startswith(required_prefix)
+        and not flags.allow_branch_prefix_override
+    ):
+        raise PreflightRefusal(
+            "Branch isolation refusal: "
+            f"current branch `{state.branch}` does not match required prefix `{required_prefix}` "
+            "(use --allow-branch-prefix-override to override)."
         )
 
     return state
