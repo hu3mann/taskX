@@ -72,6 +72,9 @@ def test_pr_open_restores_branch_after_success(tmp_path: Path, monkeypatch) -> N
         allow_dirty=False,
         allow_detached=False,
         allow_base_branch=False,
+        require_branch_prefix="feature/",
+        allow_branch_prefix_override=False,
+        refresh_llm=False,
     )
 
     current_branch = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo)
@@ -88,6 +91,14 @@ def test_pr_open_restores_branch_after_failure(tmp_path: Path, monkeypatch) -> N
     original_branch = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo)
 
     monkeypatch.setattr("taskx.pr.open.shutil.which", lambda _name: None)
+    original_git_output = pr_open_module._git_output
+
+    def _patched_git_output(repo_root, args):  # type: ignore[no-untyped-def]
+        if args == ["remote", "get-url", "origin"]:
+            return "https://github.com/acme/taskX.git"
+        return original_git_output(repo_root, args)
+
+    monkeypatch.setattr("taskx.pr.open._git_output", _patched_git_output)
 
     switched = {"done": False}
 
@@ -112,6 +123,9 @@ def test_pr_open_restores_branch_after_failure(tmp_path: Path, monkeypatch) -> N
             allow_dirty=False,
             allow_detached=False,
             allow_base_branch=False,
+            require_branch_prefix="feature/",
+            allow_branch_prefix_override=False,
+            refresh_llm=False,
         )
 
     current_branch = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo)

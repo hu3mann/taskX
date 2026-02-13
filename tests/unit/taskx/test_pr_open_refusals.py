@@ -50,6 +50,7 @@ def test_pr_open_refuses_dirty_tree(tmp_path: Path, monkeypatch) -> None:
             "Test PR",
             "--body-file",
             str(body_file),
+            "--allow-branch-prefix-override",
         ],
     )
 
@@ -79,6 +80,7 @@ def test_pr_open_refuses_detached_head(tmp_path: Path, monkeypatch) -> None:
             "Test PR",
             "--body-file",
             str(body_file),
+            "--allow-branch-prefix-override",
         ],
     )
 
@@ -86,3 +88,61 @@ def test_pr_open_refuses_detached_head(tmp_path: Path, monkeypatch) -> None:
     payload = json.loads((repo / "out" / "taskx_pr" / "PR_OPEN_REPORT.json").read_text(encoding="utf-8"))
     assert payload["status"] == "refused"
     assert "detached" in payload["refusal_reason"].lower()
+
+
+def test_pr_open_refuses_base_branch(tmp_path: Path, monkeypatch) -> None:
+    repo = _init_repo(tmp_path)
+    body_file = tmp_path / "PR_BODY_BASE.md"
+    body_file.write_text("PR body\n", encoding="utf-8")
+
+    runner = CliRunner()
+    monkeypatch.chdir(repo)
+    result = runner.invoke(
+        cli,
+        [
+            "pr",
+            "open",
+            "--repo-root",
+            str(repo),
+            "--title",
+            "Test PR",
+            "--body-file",
+            str(body_file),
+            "--base",
+            "main",
+            "--allow-branch-prefix-override",
+        ],
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads((repo / "out" / "taskx_pr" / "PR_OPEN_REPORT.json").read_text(encoding="utf-8"))
+    assert payload["status"] == "refused"
+    assert "base branch" in payload["refusal_reason"].lower()
+
+
+def test_pr_open_refuses_branch_isolation(tmp_path: Path, monkeypatch) -> None:
+    repo = _init_repo(tmp_path)
+    _run(["git", "checkout", "-b", "feature/not-allowed"], cwd=repo)
+    body_file = tmp_path / "PR_BODY_ISO.md"
+    body_file.write_text("PR body\n", encoding="utf-8")
+
+    runner = CliRunner()
+    monkeypatch.chdir(repo)
+    result = runner.invoke(
+        cli,
+        [
+            "pr",
+            "open",
+            "--repo-root",
+            str(repo),
+            "--title",
+            "Test PR",
+            "--body-file",
+            str(body_file),
+        ],
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads((repo / "out" / "taskx_pr" / "PR_OPEN_REPORT.json").read_text(encoding="utf-8"))
+    assert payload["status"] == "refused"
+    assert "branch isolation refusal" in payload["refusal_reason"].lower()
