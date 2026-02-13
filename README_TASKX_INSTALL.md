@@ -103,17 +103,23 @@ taskx pr open \
   --base main \
   --remote origin \
   --draft \
-  --restore-branch
+  --restore-branch \
+  --require-branch-prefix codex/tp-pr-open-branch-guard
 ```
 
 Default refusal rails (exit code `2`):
 - dirty tree unless `--allow-dirty`
 - detached HEAD unless `--allow-detached`
 - running from base branch unless `--allow-base-branch`
+- branch isolation refusal when current branch does not start with required prefix (override with `--allow-branch-prefix-override`)
+- remote URL cannot be parsed into `owner/repo` for deterministic fallback URL
 
 Deterministic artifacts:
 - `out/taskx_pr/PR_OPEN_REPORT.json`
 - `out/taskx_pr/PR_OPEN_REPORT.md`
+
+Optional integration:
+- `--refresh-llm` runs `taskx docs refresh-llm` before push/PR and records result in `PR_OPEN_REPORT`.
 
 ### Dev Note: Multiple TaskX Installs
 
