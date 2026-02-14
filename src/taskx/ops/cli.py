@@ -222,37 +222,79 @@ def preview(
 
 @app.command()
 def apply(
+    target: Optional[Path] = typer.Option(None, "--target"),
+    strategy: str = typer.Option("append", "--strategy"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
     platform: Optional[str] = typer.Option(None, "--platform"),
     model: Optional[str] = typer.Option(None, "--model")
 ):
     """Apply compiled prompt to instruction files."""
-    from taskx.ops.compile import load_profile, calculate_hash
-    from taskx.ops.blocks import update_file
-    from taskx.ops.discover import discover_instruction_file
+    from taskx.ops.compile import load_profile, calculate_hash, compile_prompt
+    from taskx.ops.blocks import inject_block, find_block
+    from taskx.ops.doctor import get_canonical_target
+    import difflib
     
     root = get_repo_root()
-    profile = load_profile(root / "ops" / "operator_profile.yaml")
+    profile = load_profile(root / "ops" / "operator_profile.yaml") or {}
     
+    templates_dir = root / "ops" / "templates"
+    
+    # We must have content to apply. Prefer compiled file, but compile on the fly if missing.
     compiled_path = root / "ops" / "OUT_OPERATOR_SYSTEM_PROMPT.md"
-    if not compiled_path.exists():
-        console.print("[red]No compiled prompt found. Run compile first.[/red]")
-        raise typer.Exit(1)
-        
-    content = compiled_path.read_text()
+    if compiled_path.exists():
+        content = compiled_path.read_text()
+    else:
+        try:
+            content = compile_prompt(profile, templates_dir, platform, model)
+        except Exception as e:
+            console.print(f"[red]Could not compile prompt: {e}[/red]")
+            raise typer.Exit(1)
+            
     content_hash = calculate_hash(content)
     
-    target_file = discover_instruction_file(root)
-    if not target_file:
-        console.print("[red]No instruction file found to apply to. Run init first?[/red]")
-        raise typer.Exit(1)
+    # Target selection
+    if target:
+        target_file = target
+    else:
+        # Canonical target selection policy
+        target_file = get_canonical_target(root)
         
     p = platform or profile.get("platform", {}).get("target", "chatgpt")
     m = model or profile.get("platform", {}).get("model", "UNKNOWN")
     
-    if update_file(target_file, content, p, m, content_hash):
-        console.print(f"[green]Updated {target_file}[/green]")
+    # Write behavior rule: strategy == create-new and file exists -> sidecar
+    if strategy == "create-new" and target_file.exists():
+        from taskx.ops.discover import get_sidecar_path
+        target_file = get_sidecar_path(root)
+
+    if target_file.exists():
+        old_text = target_file.read_text()
     else:
+        old_text = ""
+        
+    new_text = inject_block(old_text, content, p, m, content_hash)
+    
+    if old_text == new_text:
         console.print(f"No changes needed for {target_file}")
+        return
+
+    if dry_run:
+        console.print(f"[yellow]Dry run: Proposed changes for {target_file}[/yellow]")
+        diff = difflib.unified_diff(
+            old_text.splitlines(keepends=True),
+            new_text.splitlines(keepends=True),
+            fromfile=str(target_file),
+            tofile=str(target_file) + " (proposed)"
+        )
+        console.print("".join(diff))
+        return
+
+    # Write behavior
+    if not target_file.exists():
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+        
+    target_file.write_text(new_text)
+    console.print(f"[green]Updated {target_file}[/green]")
 
 @app.command()
 def manual(
@@ -282,6 +324,7 @@ def doctor(
         print(json_lib.dumps(report, indent=2))
     else:
         print(f"compiled_hash={report['compiled_hash']}")
+        print(f"canonical_target={report['canonical_target']}")
         print()
         
         for f in report["files"]:

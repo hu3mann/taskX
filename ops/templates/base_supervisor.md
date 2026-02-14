@@ -55,4 +55,3 @@ Unless specified otherwise, responses must be one of:
 - Audit Report
 
 Never mix formats.
-Change

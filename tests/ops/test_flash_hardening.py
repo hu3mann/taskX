@@ -48,6 +48,7 @@ def test_doctor_statuses_flash(tmp_path):
         assert "CLAUDE.md: BLOCK_OK" in result.stdout
         assert f"compiled_hash={compiled_hash}" in result.stdout
         assert f"file_hash={compiled_hash}" in result.stdout
+        assert "canonical_target=CLAUDE.md" in result.stdout
         
         # 4. BLOCK_STALE
         # Change a template without re-compiling/applying

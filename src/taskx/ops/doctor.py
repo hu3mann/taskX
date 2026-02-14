@@ -1,12 +1,72 @@
-import re
 from pathlib import Path
 
 from taskx.ops.compile import compile_prompt, load_profile, calculate_hash
 from taskx.ops.conflicts import check_conflicts
 
+def extract_operator_blocks(text: str) -> list[str]:
+    """
+    Extract operator system blocks using a deterministic line-based scanner.
+    
+    Algorithm:
+    1. Convert newlines: lines = text.splitlines()
+    2. Iterate i=0..len(lines)-1
+    3. When BEGIN line found:
+        - set start = i+1
+        - search forward for END line where lines[j].strip() == "<!-- TASKX:END operator_system -->"
+        - if END not found: treat as zero blocks
+        - else capture inner = "\n".join(lines[start:j])
+        - append inner to blocks list
+        - set i = j
+    4. Return blocks list
+    """
+    lines = text.splitlines()
+    blocks = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if "<!-- TASKX:BEGIN operator_system" in line:
+            start = i + 1
+            found_end = False
+            for j in range(start, len(lines)):
+                if lines[j].strip() == "<!-- TASKX:END operator_system -->":
+                    inner = "\n".join(lines[start:j])
+                    blocks.append(inner)
+                    i = j
+                    found_end = True
+                    break
+            if not found_end:
+                # If END not found for one BEGIN, packet says treat as zero blocks.
+                # However, practically it means we stop here and return what we found?
+                # "if END not found: treat as zero blocks (do not crash)"
+                return []
+        i += 1
+    return blocks
+
+def get_canonical_target(repo_root: Path) -> Path:
+    """
+    Returns the canonical target for instruction blocks following the GOV policy:
+    1. .claude/CLAUDE.md
+    2. CLAUDE.md
+    3. claude.md
+    4. AGENTS.md
+    5. fallback: docs/llm/TASKX_OPERATOR_SYSTEM.md
+    """
+    candidates = [
+        ".claude/CLAUDE.md",
+        "CLAUDE.md",
+        "claude.md",
+        "AGENTS.md"
+    ]
+    for rel in candidates:
+        p = repo_root / rel
+        if p.exists():
+            return p
+    return repo_root / "docs/llm/TASKX_OPERATOR_SYSTEM.md"
+
 def run_doctor(repo_root: Path) -> dict:
     report = {
         "compiled_hash": "UNKNOWN",
+        "canonical_target": str(get_canonical_target(repo_root).relative_to(repo_root)),
         "files": [],
         "conflicts": []
     }
@@ -50,10 +110,7 @@ def run_doctor(repo_root: Path) -> dict:
             continue
             
         text = path.read_text()
-        # Find all operator_system blocks. 
-        # Content is exactly between -->\n and \n<!--
-        block_pattern = r"<!-- TASKX:BEGIN operator_system.*?-->\n(.*?)\n<!-- TASKX:END operator_system -->"
-        blocks = re.findall(block_pattern, text, re.DOTALL)
+        blocks = extract_operator_blocks(text)
         
         if not blocks:
             file_info["status"] = "NO_BLOCK"

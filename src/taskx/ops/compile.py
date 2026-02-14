@@ -49,7 +49,10 @@ def compile_prompt(
 - Ensure all outputs conform to the project spec.
 """
 
-    return header + base_supervisor + "\n" + lab_boundary + "\n" + overlay + "\n" + handoff
+    prompt = header + base_supervisor + "\n" + lab_boundary + "\n" + overlay + "\n" + handoff
+    # ENSURE NO "Change" TOKENS INJECTED
+    prompt = "\n".join([line for line in prompt.splitlines() if line.strip() != "Change"])
+    return prompt
 
 def calculate_hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
