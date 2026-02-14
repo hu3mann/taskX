@@ -26,11 +26,11 @@ def find_block(text: str) -> BlockMatch | None:
 
 def inject_block(text: str, content: str, platform: str, model: str, content_hash: str) -> str:
     block = f"<!-- TASKX:BEGIN operator_system v=1 platform={platform} model={model} hash={content_hash} -->\n{content}\n<!-- TASKX:END operator_system -->"
-    
+
     existing = find_block(text)
     if existing:
         return text[:existing.start] + block + text[existing.end:]
-    
+
     if text.strip():
         return text.rstrip() + "\n\n" + block + "\n"
     return block + "\n"
@@ -41,11 +41,11 @@ def update_file(path: Path, content: str, platform: str, model: str, content_has
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         text = ""
-    
+
     existing = find_block(text)
     if existing and existing.hash == content_hash:
         return False # No change
-        
+
     new_text = inject_block(text, content, platform, model, content_hash)
     path.write_text(new_text)
     return True
