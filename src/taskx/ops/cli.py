@@ -24,18 +24,16 @@ def get_repo_root() -> Path:
 @app.command()
 def init(
     platform: str = typer.Option("chatgpt", "--platform"),
-    model: str = typer.Option("gpt-5.2-thinking", "--model"),
-    strategy: str = typer.Option("append", "--strategy"),
-    yes: bool = typer.Option(False, "--yes")
+    model: str = typer.Option("gpt-5.2-thinking", "--model")
 ):
     """Initialize operator profile and templates."""
     from taskx import __version__
     import subprocess
-    
+
     root = get_repo_root()
     ops_dir = root / "ops"
     ops_dir.mkdir(exist_ok=True)
-    
+
     # Try to get git head for pin
     pin_value = "UNKNOWN"
     try:
@@ -65,11 +63,11 @@ def init(
         with open(profile_path, "w") as f:
             yaml.dump(profile, f)
         console.print(f"[green]Created {profile_path}[/green]")
-    
+
     templates_dir = ops_dir / "templates"
     templates_dir.mkdir(exist_ok=True)
     (templates_dir / "overlays").mkdir(exist_ok=True)
-    
+
     base_supervisor_text = """# BASE SUPERVISOR (Canonical Minimal Baseline v1)
 
 ## Role
@@ -165,7 +163,7 @@ When forced to choose:
         p = templates_dir / t
         if not p.exists():
             p.write_text(content)
-            
+
     overlay_p = templates_dir / "overlays" / f"{platform}.md"
     if not overlay_p.exists():
         overlay_p.write_text(f"# {platform} Overlay\nSpecifics for {platform}\n")
@@ -174,25 +172,24 @@ When forced to choose:
 
 @app.command()
 def compile(
-    out: Optional[Path] = typer.Option(None, "--out"),
-    platform: Optional[str] = typer.Option(None, "--platform"),
-    model: Optional[str] = typer.Option(None, "--model")
+    out: Path | None = typer.Option(None, "--out"),
+    platform: str | None = typer.Option(None, "--platform"),
+    model: str | None = typer.Option(None, "--model")
 ):
     """Compile the operator system prompt."""
     root = get_repo_root()
     profile = load_profile(root / "ops" / "operator_profile.yaml")
     templates_dir = root / "ops" / "templates"
-    
+
     compiled = compile_prompt(profile, templates_dir, platform, model)
-    
+
     out_path = out or (root / "ops" / "OUT_OPERATOR_SYSTEM_PROMPT.md")
     out_path.write_text(compiled)
     console.print(f"[green]Compiled prompt written to {out_path}[/green]")
 
 @app.command()
 def preview(
-    target: Optional[Path] = typer.Option(None, "--target"),
-    strategy: str = typer.Option("append", "--strategy")
+    target: Path | None = typer.Option(None, "--target")
 ):
     """Preview changes to instruction files."""
     root = get_repo_root()
@@ -204,14 +201,11 @@ def preview(
     model = profile.get("platform", {}).get("model", "UNKNOWN")
 
     target_file = target or discover_instruction_file(root) or get_sidecar_path(root)
-    
-    if target_file.exists():
-        old_text = target_file.read_text()
-    else:
-        old_text = ""
-        
+
+    old_text = target_file.read_text() if target_file.exists() else ""
+
     new_text = inject_block(old_text, compiled, platform, model, content_hash)
-    
+
     diff = difflib.unified_diff(
         old_text.splitlines(keepends=True),
         new_text.splitlines(keepends=True),
@@ -222,23 +216,22 @@ def preview(
 
 @app.command()
 def apply(
-    target: Optional[Path] = typer.Option(None, "--target"),
+    target: Path | None = typer.Option(None, "--target"),
     strategy: str = typer.Option("append", "--strategy"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    platform: Optional[str] = typer.Option(None, "--platform"),
-    model: Optional[str] = typer.Option(None, "--model")
+    platform: str | None = typer.Option(None, "--platform"),
+    model: str | None = typer.Option(None, "--model")
 ):
     """Apply compiled prompt to instruction files."""
     from taskx.ops.compile import load_profile, calculate_hash, compile_prompt
-    from taskx.ops.blocks import inject_block, find_block
+    from taskx.ops.blocks import inject_block
     from taskx.ops.doctor import get_canonical_target
-    import difflib
-    
+
     root = get_repo_root()
     profile = load_profile(root / "ops" / "operator_profile.yaml") or {}
-    
+
     templates_dir = root / "ops" / "templates"
-    
+
     # We must have content to apply. Prefer compiled file, but compile on the fly if missing.
     compiled_path = root / "ops" / "OUT_OPERATOR_SYSTEM_PROMPT.md"
     if compiled_path.exists():
@@ -248,20 +241,16 @@ def apply(
             content = compile_prompt(profile, templates_dir, platform, model)
         except Exception as e:
             console.print(f"[red]Could not compile prompt: {e}[/red]")
-            raise typer.Exit(1)
-            
+            raise typer.Exit(1) from e
+
     content_hash = calculate_hash(content)
-    
+
     # Target selection
-    if target:
-        target_file = target
-    else:
-        # Canonical target selection policy
-        target_file = get_canonical_target(root)
-        
+    target_file = target or get_canonical_target(root)
+
     p = platform or profile.get("platform", {}).get("target", "chatgpt")
     m = model or profile.get("platform", {}).get("model", "UNKNOWN")
-    
+
     # Write behavior rule: strategy == create-new and file exists -> sidecar
     if strategy == "create-new" and target_file.exists():
         from taskx.ops.discover import get_sidecar_path
@@ -271,9 +260,9 @@ def apply(
         old_text = target_file.read_text()
     else:
         old_text = ""
-        
+
     new_text = inject_block(old_text, content, p, m, content_hash)
-    
+
     if old_text == new_text:
         console.print(f"No changes needed for {target_file}")
         return
@@ -292,19 +281,19 @@ def apply(
     # Write behavior
     if not target_file.exists():
         target_file.parent.mkdir(parents=True, exist_ok=True)
-        
+
     target_file.write_text(new_text)
     console.print(f"[green]Updated {target_file}[/green]")
 
 @app.command()
 def manual(
-    platform: Optional[str] = typer.Option(None, "--platform"),
-    model: Optional[str] = typer.Option(None, "--model")
+    platform: str | None = typer.Option(None, "--platform"),
+    model: str | None = typer.Option(None, "--model")
 ):
     """Run manual merge mode."""
     from taskx.ops.manual import run_manual_mode
     from taskx.ops.compile import compile_prompt, load_profile
-    
+
     root = get_repo_root()
     profile = load_profile(root / "ops" / "operator_profile.yaml")
     compiled = compile_prompt(profile, root / "ops" / "templates")
@@ -318,7 +307,7 @@ def doctor(
     from taskx.ops.doctor import run_doctor
     root = get_repo_root()
     report = run_doctor(root)
-    
+
     if json:
         import json as json_lib
         print(json_lib.dumps(report, indent=2))
@@ -326,9 +315,15 @@ def doctor(
         print(f"compiled_hash={report['compiled_hash']}")
         print(f"canonical_target={report['canonical_target']}")
         print()
-        
+
         for f in report["files"]:
             print(f"{f['path']}: {f['status']}")
             if f["status"] in ["BLOCK_OK", "BLOCK_STALE"]:
                 print(f"file_hash={f['file_hash']}")
             print()
+
+        if report["conflicts"]:
+            print("Conflicts detected:")
+            for c in report["conflicts"]:
+                print(f"- {c['file']}:{c['line']}: {c['phrase']}")
+                print(f"  Rec: {c['recommendation']}")
