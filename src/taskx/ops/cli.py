@@ -1,16 +1,14 @@
-import os
-import yaml
 import difflib
 from pathlib import Path
-from typing import Optional
 
 import typer
+import yaml
 from rich.console import Console
 
-from taskx.ops.compile import load_profile, compile_prompt, calculate_hash
+from taskx.ops.blocks import inject_block
+from taskx.ops.compile import calculate_hash, compile_prompt, load_profile
 from taskx.ops.discover import discover_instruction_file, get_sidecar_path
 from taskx.utils.repo import detect_repo_root
-from taskx.ops.blocks import inject_block, find_block
 
 app = typer.Typer(help="Manage operator system instructions.")
 console = Console()
