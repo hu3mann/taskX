@@ -1,16 +1,32 @@
+import re
 from pathlib import Path
-from typing import Dict, Any, List
-from taskx.ops.discover import discover_instruction_file, get_sidecar_path
-from taskx.ops.blocks import find_block
-from taskx.ops.conflicts import check_conflicts, Conflict
 
-def run_doctor(repo_root: Path) -> Dict[str, Any]:
+from taskx.ops.compile import compile_prompt, load_profile, calculate_hash
+from taskx.ops.conflicts import check_conflicts
+
+def run_doctor(repo_root: Path) -> dict:
     report = {
+        "compiled_hash": "UNKNOWN",
         "files": [],
         "conflicts": []
     }
     
-    # Check common files
+    ops_dir = repo_root / "ops"
+    templates_dir = ops_dir / "templates"
+    profile_path = ops_dir / "operator_profile.yaml"
+    compiled_path = ops_dir / "OUT_OPERATOR_SYSTEM_PROMPT.md"
+    
+    # Determine compiled_hash
+    if compiled_path.exists():
+        report["compiled_hash"] = calculate_hash(compiled_path.read_text())
+    elif profile_path.exists():
+        profile = load_profile(profile_path)
+        try:
+            compiled_prompt = compile_prompt(profile, templates_dir)
+            report["compiled_hash"] = calculate_hash(compiled_prompt)
+        except Exception:
+            pass
+    
     candidates = [
         ".claude/CLAUDE.md",
         "CLAUDE.md",
@@ -25,10 +41,8 @@ def run_doctor(repo_root: Path) -> Dict[str, Any]:
         path = repo_root / rel_path
         file_info = {
             "path": rel_path,
-            "exists": path.exists(),
-            "has_block": False,
-            "hash_matches": False,
-            "duplicates": False
+            "status": "MISSING",
+            "file_hash": None
         }
         
         if not path.exists():
@@ -36,11 +50,24 @@ def run_doctor(repo_root: Path) -> Dict[str, Any]:
             continue
             
         text = path.read_text()
-        blocks = re.findall(r"<!-- TASKX:BEGIN operator_system", text)
-        if blocks:
-            file_info["has_block"] = True
-            if len(blocks) > 1:
-                file_info["duplicates"] = True
+        # Find all operator_system blocks. 
+        # Content is exactly between -->\n and \n<!--
+        block_pattern = r"<!-- TASKX:BEGIN operator_system.*?-->\n(.*?)\n<!-- TASKX:END operator_system -->"
+        blocks = re.findall(block_pattern, text, re.DOTALL)
+        
+        if not blocks:
+            file_info["status"] = "NO_BLOCK"
+        elif len(blocks) > 1:
+            file_info["status"] = "BLOCK_DUPLICATE"
+        else:
+            # Exactly one block.
+            inner_content = blocks[0]
+            file_info["file_hash"] = calculate_hash(inner_content)
+            
+            if report["compiled_hash"] != "UNKNOWN" and file_info["file_hash"] == report["compiled_hash"]:
+                file_info["status"] = "BLOCK_OK"
+            else:
+                file_info["status"] = "BLOCK_STALE"
         
         report["files"].append(file_info)
         
@@ -54,5 +81,3 @@ def run_doctor(repo_root: Path) -> Dict[str, Any]:
             })
             
     return report
-
-import re

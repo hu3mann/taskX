@@ -9,15 +9,13 @@ from rich.console import Console
 
 from taskx.ops.compile import load_profile, compile_prompt, calculate_hash
 from taskx.ops.discover import discover_instruction_file, get_sidecar_path
-from taskx.ops.blocks import update_file, find_block, inject_block
-from taskx.ops.doctor import run_doctor
-from taskx.ops.manual import run_manual_mode
+from taskx.utils.repo import detect_repo_root
+from taskx.ops.blocks import inject_block, find_block
 
 app = typer.Typer(help="Manage operator system instructions.")
 console = Console()
 
 def get_repo_root() -> Path:
-    from taskx.utils.repo import detect_repo_root
     try:
         return detect_repo_root(Path.cwd()).root
     except RuntimeError:
@@ -72,14 +70,95 @@ def init(
     templates_dir.mkdir(exist_ok=True)
     (templates_dir / "overlays").mkdir(exist_ok=True)
     
-    base_supervisor_text = """# BASE SUPERVISOR
-- Task packets are law.
-- Correctness over speed.
-- Determinism is the goal.
+    base_supervisor_text = """# BASE SUPERVISOR (Canonical Minimal Baseline v1)
+
+## Role
+
+You are the Supervisor / Auditor.
+
+You:
+- Author Task Packets.
+- Enforce invariants.
+- Audit implementer output.
+- Protect determinism and auditability.
+
+You are NOT:
+- The implementer.
+- A runtime generator.
+- A copywriter.
+
+## Authority Hierarchy (Highest -> Lowest)
+
+1. Active Task Packet
+2. Repository code and tests
+3. Explicit schemas and formal contracts
+4. Versioned project docs
+5. Existing implementation
+6. Model heuristics
+
+If a conflict is detected:
+- STOP.
+- Surface the conflict explicitly.
+- Do not auto-resolve.
+
+## Non-Negotiables
+
+- Task Packets are law.
+- No fabrication.
+- If evidence is missing -> mark UNKNOWN and request specific file/output.
+- Prefer minimal diffs.
+- Determinism over cleverness.
+- Every change must be auditable.
+
+## Determinism Contract
+
+- Same inputs -> same outputs.
+- No hidden randomness.
+- No time-based logic unless explicitly allowed.
+- Outputs must be reproducible.
+
+## Output Discipline
+
+Unless specified otherwise, responses must be one of:
+
+- Design Spec
+- Task Packet
+- Patch Instructions
+- Audit Report
+
+Never mix formats.
 """
-    lab_boundary_text = """# LAB BOUNDARY
-- All tool outputs are simulated unless in PROD mode.
-- Report all violations to the auditor.
+    lab_boundary_text = """# LAB BOUNDARY (Canonical Minimal Baseline v1)
+
+## Project Context
+
+You are operating inside a Development & Architecture Lab.
+
+This lab:
+- Designs systems.
+- Defines prompts, rules, schemas, and invariants.
+- Audits correctness and failure modes.
+
+This lab does NOT:
+- Act as live production runtime.
+- Optimize for persuasion or conversion unless explicitly marked as test output.
+- Generate final production artifacts unless instructed.
+
+## Mode Discipline
+
+If user intent is unclear:
+- Ask for clarification.
+- Do not guess.
+
+If asked to perform runtime behavior inside lab mode:
+- Pause and confirm whether this is lab testing or production generation.
+
+## Correctness Priority
+
+When forced to choose:
+- Correctness over speed.
+- Clarity over cleverness.
+- Explicit contracts over implicit behavior.
 """
 
     for t, content in [("base_supervisor.md", base_supervisor_text), ("lab_boundary.md", lab_boundary_text)]:
@@ -143,47 +222,58 @@ def preview(
 
 @app.command()
 def apply(
-    target: Optional[Path] = typer.Option(None, "--target"),
-    strategy: str = typer.Option("append", "--strategy"),
-    dry_run: bool = typer.Option(False, "--dry-run")
+    platform: Optional[str] = typer.Option(None, "--platform"),
+    model: Optional[str] = typer.Option(None, "--model")
 ):
     """Apply compiled prompt to instruction files."""
-    if dry_run:
-        return preview(target, strategy)
-        
+    from taskx.ops.compile import load_profile, calculate_hash
+    from taskx.ops.blocks import update_file
+    from taskx.ops.discover import discover_instruction_file
+    
     root = get_repo_root()
     profile = load_profile(root / "ops" / "operator_profile.yaml")
-    templates_dir = root / "ops" / "templates"
-    compiled = compile_prompt(profile, templates_dir)
-    content_hash = calculate_hash(compiled)
-    platform = profile.get("platform", {}).get("target", "chatgpt")
-    model = profile.get("platform", {}).get("model", "UNKNOWN")
-
-    target_file = target or discover_instruction_file(root) or get_sidecar_path(root)
     
-    changed = update_file(target_file, compiled, platform, model, content_hash)
-    if changed:
+    compiled_path = root / "ops" / "OUT_OPERATOR_SYSTEM_PROMPT.md"
+    if not compiled_path.exists():
+        console.print("[red]No compiled prompt found. Run compile first.[/red]")
+        raise typer.Exit(1)
+        
+    content = compiled_path.read_text()
+    content_hash = calculate_hash(content)
+    
+    target_file = discover_instruction_file(root)
+    if not target_file:
+        console.print("[red]No instruction file found to apply to. Run init first?[/red]")
+        raise typer.Exit(1)
+        
+    p = platform or profile.get("platform", {}).get("target", "chatgpt")
+    m = model or profile.get("platform", {}).get("model", "UNKNOWN")
+    
+    if update_file(target_file, content, p, m, content_hash):
         console.print(f"[green]Updated {target_file}[/green]")
     else:
-        console.print(f"[yellow]No changes needed for {target_file}[/yellow]")
+        console.print(f"No changes needed for {target_file}")
 
 @app.command()
 def manual(
-    out: Optional[Path] = typer.Option(None, "--out"),
     platform: Optional[str] = typer.Option(None, "--platform"),
     model: Optional[str] = typer.Option(None, "--model")
 ):
     """Run manual merge mode."""
+    from taskx.ops.manual import run_manual_mode
+    from taskx.ops.compile import compile_prompt, load_profile
+    
     root = get_repo_root()
     profile = load_profile(root / "ops" / "operator_profile.yaml")
-    templates_dir = root / "ops" / "templates"
-    compiled = compile_prompt(profile, templates_dir, platform, model)
-    
+    compiled = compile_prompt(profile, root / "ops" / "templates")
     run_manual_mode(compiled, platform or "chatgpt", model or "UNKNOWN")
 
 @app.command()
-def doctor(json: bool = typer.Option(False, "--json")):
+def doctor(
+    json: bool = typer.Option(False, "--json")
+):
     """Scan instruction files for issues and conflicts."""
+    from taskx.ops.doctor import run_doctor
     root = get_repo_root()
     report = run_doctor(root)
     
@@ -191,21 +281,11 @@ def doctor(json: bool = typer.Option(False, "--json")):
         import json as json_lib
         print(json_lib.dumps(report, indent=2))
     else:
-        console.print("[bold]TaskX Ops Doctor Report[/bold]")
+        print(f"compiled_hash={report['compiled_hash']}")
+        print()
+        
         for f in report["files"]:
-            if not f["exists"]:
-                status = "[dim]MISSING[/dim]"
-            elif f["has_block"]:
-                status = "[green]OK[/green]"
-            else:
-                status = "[yellow]MISSING BLOCK[/yellow]"
-                
-            if f["duplicates"]:
-                status = "[red]DUPLICATE BLOCKS[/red]"
-            console.print(f"- {f['path']}: {status}")
-            
-        if report["conflicts"]:
-            console.print("\n[red]Conflicts detected:[/red]")
-            for c in report["conflicts"]:
-                console.print(f"- {c['file']}:{c['line']}: {c['phrase']}")
-                console.print(f"  [cyan]Rec:[/cyan] {c['recommendation']}")
+            print(f"{f['path']}: {f['status']}")
+            if f["status"] in ["BLOCK_OK", "BLOCK_STALE"]:
+                print(f"file_hash={f['file_hash']}")
+            print()

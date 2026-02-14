@@ -6,6 +6,6 @@ project:
   repo_root: /Users/hue/code/taskX
   timezone: America/Vancouver
 taskx:
-  cli_min_version: 0.1.0
+  cli_min_version: 0.1.2
   pin_type: git_commit
-  pin_value: UNKNOWN
+  pin_value: 50548e9c079fb86245d8580f25cf7d11485be528

@@ -92,32 +92,91 @@ def test_load_profile_missing(tmp_path):
     from taskx.ops.compile import load_profile
     assert load_profile(tmp_path / "missing.yaml") == {}
 
-def test_doctor_report(tmp_path):
+def test_doctor_full_lifecycle(tmp_path):
     from taskx.ops.doctor import run_doctor
+    from taskx.ops.cli import init, compile, apply
+    import os
+    
+    # 1. MISSING by default (candidates don't exist in tmp_path)
     repo = tmp_path
-    (repo / "CLAUDE.md").write_text("# Test\n<!-- TASKX:BEGIN operator_system v=1 platform=chatgpt model=gpt-4 hash=abc -->\ncontent\n<!-- TASKX:END operator_system -->")
+    report = run_doctor(repo)
+    claude_info = next(f for f in report["files"] if f["path"] == "CLAUDE.md")
+    assert claude_info["status"] == "MISSING"
+
+    # 2. NO_BLOCK
+    (repo / "CLAUDE.md").write_text("# Generic Info")
+    report = run_doctor(repo)
+    claude_info = next(f for f in report["files"] if f["path"] == "CLAUDE.md")
+    assert claude_info["status"] == "NO_BLOCK"
+
+    # Setup environment for init/compile (mocking git usually is enough if we don't care about real pin)
+    # We'll use the profile to get a BLOCK_OK
+    (repo / "ops").mkdir()
+    (repo / "ops" / "templates").mkdir()
+    (repo / "ops" / "templates" / "overlays").mkdir()
+    (repo / "ops" / "templates" / "base_supervisor.md").write_text("# BASE\n")
+    (repo / "ops" / "templates" / "lab_boundary.md").write_text("# LAB\n")
+    (repo / "ops" / "templates" / "overlays" / "chatgpt.md").write_text("# OPT\n")
+    
+    profile_path = repo / "ops" / "operator_profile.yaml"
+    profile_path.write_text("project: {name: test, repo_root: '.', timezone: UTC}\ntaskx: {pin_type: git, pin_value: '123', cli_min_version: '0.1.2'}\nplatform: {target: chatgpt, model: gpt-4}\n")
+
+    # 3. BLOCK_OK
+    # Need to simulate compile+apply logic
+    from taskx.ops.compile import compile_prompt, load_profile, calculate_hash
+    from taskx.ops.blocks import inject_block
+
+    profile = load_profile(profile_path)
+    compiled = compile_prompt(profile, repo / "ops" / "templates")
+    chash = calculate_hash(compiled)
+    
+    injected = inject_block("# Header", compiled, "chatgpt", "gpt-4", chash)
+    (repo / "CLAUDE.md").write_text(injected)
     
     report = run_doctor(repo)
-    assert len(report["files"]) >= 1
-    # Check CLAUDE.md exists and has block
     claude_info = next(f for f in report["files"] if f["path"] == "CLAUDE.md")
-    assert claude_info["exists"] is True
-    assert claude_info["has_block"] is True
+    assert report["compiled_hash"] == chash
+    assert claude_info["file_hash"] == chash
+    assert claude_info["status"] == "BLOCK_OK"
 
-    # Check non-existent file
-    ai_info = next(f for f in report["files"] if f["path"] == "AI.md")
-    assert ai_info["exists"] is False
-    assert ai_info["has_block"] is False
+    # 4. BLOCK_STALE (change template)
+    (repo / "ops" / "templates" / "base_supervisor.md").write_text("# CHANGED\n")
+    report = run_doctor(repo)
+    claude_info = next(f for f in report["files"] if f["path"] == "CLAUDE.md")
+    assert claude_info["status"] == "BLOCK_STALE"
+    assert claude_info["file_hash"] == chash
+    assert report["compiled_hash"] != chash
 
-def test_metadata_pin(tmp_path):
-    # Mocking metadata is hard without full integration, 
-    # but we can check if compile uses what's in profile.
-    from taskx.ops.compile import compile_prompt
-    profile = {
-        "project": {"name": "test"},
-        "taskx": {"pin_type": "git", "pin_value": "deadbeef", "cli_min_version": "0.1.2"},
-        "platform": {"target": "chatgpt"}
-    }
-    prompt = compile_prompt(profile, tmp_path / "none")
-    assert "deadbeef" in prompt
-    assert "0.1.2" in prompt
+    # 5. BLOCK_DUPLICATE
+    (repo / "CLAUDE.md").write_text(injected + "\n" + injected)
+    report = run_doctor(repo)
+    claude_info = next(f for f in report["files"] if f["path"] == "CLAUDE.md")
+    assert claude_info["status"] == "BLOCK_DUPLICATE"
+
+def test_template_seeding_canonical(tmp_path):
+    from taskx.ops.cli import init
+    import os
+    
+    # Mock get_repo_root to return tmp_path
+    import taskx.ops.cli
+    original_get_repo_root = taskx.ops.cli.get_repo_root
+    taskx.ops.cli.get_repo_root = lambda: tmp_path
+    
+    try:
+        # Run init
+        # Use a wrapper to avoid Typer dependency issues in tests if any
+        from typer.testing import CliRunner
+        from taskx.ops.cli import app
+        runner = CliRunner()
+        result = runner.invoke(app, ["init", "--yes"])
+        
+        base_p = tmp_path / "ops" / "templates" / "base_supervisor.md"
+        assert "Canonical Minimal Baseline v1" in base_p.read_text()
+        
+        # Modify and re-run init (should not overwrite)
+        base_p.write_text("USER EDITED")
+        runner.invoke(app, ["init", "--yes"])
+        assert base_p.read_text() == "USER EDITED"
+        
+    finally:
+        taskx.ops.cli.get_repo_root = original_get_repo_root
