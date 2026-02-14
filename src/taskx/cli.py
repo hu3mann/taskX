@@ -108,12 +108,19 @@ try:
 except ImportError:
     audit_case_impl = None  # type: ignore
 
+try:
+    from taskx.ops.cli import app as ops_app
+except ImportError:
+    ops_app = None  # type: ignore
+
 
 cli = typer.Typer(
     name="taskx",
     help="TaskX - Minimal Task Packet Lifecycle CLI",
     no_args_is_help=True,
 )
+if ops_app:
+    cli.add_typer(ops_app, name="ops")
 console = Console()
 
 

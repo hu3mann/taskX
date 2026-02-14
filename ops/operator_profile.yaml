@@ -1,0 +1,11 @@
+platform:
+  model: gpt-5.2-thinking
+  target: chatgpt
+project:
+  name: taskX
+  repo_root: /Users/hue/code/taskX
+  timezone: America/Vancouver
+taskx:
+  cli_min_version: 0.1.0
+  pin_type: git_commit
+  pin_value: UNKNOWN
