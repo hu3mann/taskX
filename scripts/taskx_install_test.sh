@@ -19,7 +19,7 @@ echo "Testing wheel: $WHEEL_FILE"
 TEMP_VENV=$(mktemp -d -t taskx-test-venv.XXXXXX)
 echo "Creating temporary venv: $TEMP_VENV"
 
-python -m venv "$TEMP_VENV"
+uv venv "$TEMP_VENV"
 
 # Activate venv
 if [ -f "$TEMP_VENV/bin/activate" ]; then
@@ -36,7 +36,7 @@ fi
 
 # Install wheel
 echo "Installing wheel..."
-pip install "$WHEEL_FILE" --quiet
+uv pip install "$WHEEL_FILE" --quiet
 
 # Test 1: taskx --help
 echo "Test 1: taskx --help"

@@ -42,23 +42,18 @@ main() {
 
     # Create clean venv
     log_info "Creating clean venv..."
-    python3 -m venv "$VENV_PATH"
+    uv venv "$VENV_PATH"
     source "$VENV_PATH/bin/activate"
-
-    # Install build tools
-    log_info "Installing build tools..."
-    pip install --quiet --upgrade pip build || { log_error "Build tools install failed"; exit 1; }
-    log_info "✅ Build tools installed"
 
     # Build TaskX
     log_info "Building TaskX..."
     cd "$REPO_ROOT"
-    python -m build --quiet || { log_error "Build failed"; exit 1; }
+    uv build || { log_error "Build failed"; exit 1; }
     log_info "✅ Build successful"
 
     # Install wheel
     log_info "Installing TaskX wheel..."
-    pip install --quiet --force-reinstall dist/*.whl || { log_error "Install failed"; exit 1; }
+    uv pip install --quiet --reinstall dist/*.whl || { log_error "Install failed"; exit 1; }
     log_info "✅ TaskX installed"
 
     # Verify installation
