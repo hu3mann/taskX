@@ -17,3 +17,4 @@ build/
 
 # Local outputs
 out/
+.mypy_cache/

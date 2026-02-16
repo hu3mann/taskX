@@ -47,8 +47,8 @@ def test_route_plan_refusal_writes_expected_artifacts(tmp_path: Path) -> None:
 
     refusal_reasons = plan["refusal_reasons"]
     assert len(refusal_reasons) == 2
-    assert refusal_reasons[0].startswith("Step `alpha` below score threshold:")
-    assert refusal_reasons[1].startswith("Step `beta` below score threshold:")
+    assert refusal_reasons[0]["message"].startswith("Step `alpha` below score threshold:")
+    assert refusal_reasons[1]["message"].startswith("Step `beta` below score threshold:")
 
     assert ordered_steps(plan["steps"]) == ["alpha", "beta"]
     for step in plan["steps"]:
@@ -92,7 +92,7 @@ def test_route_plan_refuses_when_availability_missing(tmp_path: Path) -> None:
     assert plan["status"] == "refused"
     assert plan["policy"]["escalation_ladder"] == DEFAULT_ESCALATION_LADDER
     assert ordered_steps(plan["steps"]) == list(DEFAULT_STEPS)
-    reason = plan["refusal_reasons"][0]
+    reason = plan["refusal_reasons"][0]["message"]
     assert "Missing availability config" in reason
     assert "availability" in reason.lower()
     assert "missing" in reason.lower()

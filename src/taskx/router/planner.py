@@ -152,7 +152,10 @@ def build_route_plan(
             )
         )
 
-    unique_reasons = tuple(dict.fromkeys(refusal_reasons))
+    unique_reasons = tuple(
+        RefusalReason(reason_code="SCORE_THRESHOLD" if "score" in r else "NO_CANDIDATE", message=r)
+        for r in dict.fromkeys(refusal_reasons)
+    )
     status = "refused" if unique_reasons else "ok"
     return RoutePlan(
         status=status,
@@ -181,7 +184,9 @@ def _route_plan_from_availability_failure(
         availability_path=availability_path,
         policy=default_route_policy(),
         steps=tuple(_empty_step(step_name) for step_name in steps),
-        refusal_reasons=(refusal_reason,),
+        refusal_reasons=(
+            RefusalReason(reason_code="AVAILABILITY_ERROR", message=refusal_reason),
+        ),
     )
 
 
