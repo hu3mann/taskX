@@ -12,13 +12,9 @@ if [ -d "dist" ]; then
     rm -rf dist/
 fi
 
-# Upgrade build tools
-echo "Upgrading pip, build, and twine..."
-python -m pip install -U pip build twine --quiet
-
-# Build sdist and wheel
+# Build sdist and wheel using uv
 echo "Building sdist and wheel..."
-python -m build
+uv build
 
 # Check that artifacts were created
 if [ ! -d "dist" ] || [ -z "$(ls -A dist/)" ]; then
@@ -29,8 +25,8 @@ fi
 echo "Built packages:"
 ls -lh dist/
 
-# Validate with twine
+# Validate with twine via uvx
 echo "Validating packages with twine..."
-python -m twine check dist/*
+uvx twine check dist/*
 
 echo "✅ Build complete and validated"

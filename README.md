@@ -81,11 +81,11 @@ Get up and running faster than you can say "idempotency."
 
 ### 1. Installation
 
-The easiest way to join the cult—err, project—is via pip:
+The easiest way to join the cult—err, project—is via uv:
 
 ```bash
 # Latest stable tag
-pip install "taskx @ git+ssh://git@github.com/OWNER/REPO.git@v0.1.0"
+uv pip install "taskx @ git+ssh://git@github.com/OWNER/REPO.git@v0.1.0"
 ```
 
 *Need a wheel, `requirements.txt`, or a unified installer script? Check the [Detailed Installation Guide](docs/INSTALL.md).*
@@ -162,7 +162,7 @@ It's like magic, but deterministic.
 
 ## 🏗 Contributing
 
-We are strict but fair.
+We are strict but fair. We use `uv` for dependency management.
 
 - **Linting**: We use `ruff`.
 - **Typing**: We use `mypy --strict`.

@@ -54,7 +54,15 @@ TASKX_LOCAL_PATH="${TASKX_LOCAL_PATH:-}"
 TASKX_PKG_TOKEN="${TASKX_PKG_TOKEN:-}"
 TASKX_INDEX_URL="${TASKX_INDEX_URL:-}"
 TASKX_EXTRA_INDEX_URL="${TASKX_EXTRA_INDEX_URL:-https://pypi.org/simple}"
-TASKX_PIP="${TASKX_PIP:-python -m pip}"
+
+# Detect pip command (prefer uv pip if available)
+if [[ -z "${TASKX_PIP:-}" ]]; then
+  if command -v uv &> /dev/null; then
+    TASKX_PIP="uv pip"
+  else
+    TASKX_PIP="python -m pip"
+  fi
+fi
 
 # ============================================================================
 # Utility Functions
