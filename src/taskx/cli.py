@@ -5,7 +5,7 @@ import re
 import shutil
 import subprocess
 import sys
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -121,14 +121,14 @@ def _use_compat_options(*_values: object) -> None:
     """Mark backward-compatible CLI options as intentionally accepted."""
 
 
-class DirtyPolicy(str, Enum):
+class DirtyPolicy(StrEnum):
     """Dirty working tree handling policy for deterministic commands."""
 
     REFUSE = "refuse"
     STASH = "stash"
 
 
-class FinishMode(str, Enum):
+class FinishMode(StrEnum):
     """Supported finish strategies."""
 
     REBASE_FF = "rebase-ff"
@@ -2797,7 +2797,7 @@ def ci_gate_cmd(
 
 
 
-class ProjectPreset(str, Enum):
+class ProjectPreset(StrEnum):
     """Supported directive presets for project init."""
 
     TASKX = "taskx"
@@ -2806,14 +2806,14 @@ class ProjectPreset(str, Enum):
     NONE = "none"
 
 
-class ProjectPack(str, Enum):
+class ProjectPack(StrEnum):
     """Supported directive packs for project toggles."""
 
     TASKX = "taskx"
     CHATX = "chatx"
 
 
-class ProjectMode(str, Enum):
+class ProjectMode(StrEnum):
     """Supported master modes."""
 
     TASKX = "taskx"

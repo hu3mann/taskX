@@ -23,7 +23,7 @@ on:
         - coordination
 
 env:
-  CONTEXT7_MANDATORY: true
+  CONTEXT7_MANDATORY: false
   PLATFORM_EVOLUTION_MODE: true
   AGENT_ORCHESTRATION: enabled
 
