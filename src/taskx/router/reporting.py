@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from taskx.router.handoff import render_handoff_markdown
-from taskx.router.types import PlannedStep, RoutePlan, RoutePolicy, TopCandidate
+from taskx.router.types import PlannedStep, RefusalReason, RoutePlan, RoutePolicy, TopCandidate
 
 
 def route_plan_to_dict(plan: RoutePlan) -> dict[str, Any]:
@@ -25,7 +25,7 @@ def route_plan_to_dict(plan: RoutePlan) -> dict[str, Any]:
             "max_escalations": plan.policy.max_escalations,
             "min_total_score": plan.policy.min_total_score,
         },
-        "refusal_reasons": list(plan.refusal_reasons),
+        "refusal_reasons": [r.to_dict() for r in plan.refusal_reasons],
         "steps": [
             {
                 "step": step.step,
@@ -94,6 +94,19 @@ def route_plan_from_dict(payload: dict[str, Any]) -> RoutePlan:
             )
         )
 
+    refusal_reasons_data = payload.get("refusal_reasons", [])
+    refusal_reasons: list[RefusalReason] = []
+    for item in refusal_reasons_data:
+        if isinstance(item, dict):
+            refusal_reasons.append(RefusalReason(
+                reason_code=item.get("reason_code"),
+                message=str(item.get("message", "")),
+                detail=item.get("detail"),
+            ))
+        elif isinstance(item, str):
+            # Fallback for legacy format
+            refusal_reasons.append(RefusalReason(reason_code="UNKNOWN", message=item))
+
     return RoutePlan(
         status=str(payload["status"]),
         repo_root=Path(payload["repo_root"]),
@@ -101,7 +114,7 @@ def route_plan_from_dict(payload: dict[str, Any]) -> RoutePlan:
         availability_path=Path(payload["availability_path"]),
         policy=policy,
         steps=tuple(steps),
-        refusal_reasons=tuple(payload.get("refusal_reasons", [])),
+        refusal_reasons=tuple(refusal_reasons),
     )
 
 

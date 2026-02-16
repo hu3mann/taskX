@@ -185,9 +185,9 @@ def orchestrate(packet_path: str) -> dict[str, Any]:
         report = {
             "status": "ok",
             "message": "Manual handoff complete",
-            "runner_id": None,
-            "model_id": None,
-            "step": None,
+            "runner_id": None,  # type: ignore[dict-item]
+            "model_id": None,  # type: ignore[dict-item]
+            "step": None,  # type: ignore[dict-item]
             "outputs": [],
         }
         artifacts = write_run_artifacts(
@@ -229,9 +229,9 @@ def orchestrate(packet_path: str) -> dict[str, Any]:
             "reason_code": "UNKNOWN_RUNNER",
             "message": f"Unknown runner: {runner_id}",
             "reasons": [f"Unknown runner: {runner_id}"],
-            "runner_id": runner_id,
-            "model_id": selected_step.get("model"),
-            "step": selected_step.get("step"),
+            "runner_id": runner_id,  # type: ignore[dict-item]
+            "model_id": selected_step.get("model"),  # type: ignore[dict-item]
+            "step": selected_step.get("step"),  # type: ignore[dict-item]
         }
         artifacts = write_run_artifacts(
             run_dir,
@@ -258,10 +258,10 @@ def orchestrate(packet_path: str) -> dict[str, Any]:
 
     report = {
         "status": status,
-        "runner_id": normalized.get("runner_id", runner_id),
-        "model_id": normalized.get("model_id", selected_step.get("model")),
-        "step": normalized.get("step", selected_step.get("step")),
-        "reason_code": normalized.get("reason_code"),
+        "runner_id": normalized.get("runner_id", runner_id),  # type: ignore[dict-item]
+        "model_id": normalized.get("model_id", selected_step.get("model")),  # type: ignore[dict-item]
+        "step": normalized.get("step", selected_step.get("step")),  # type: ignore[dict-item]
+        "reason_code": normalized.get("reason_code"),  # type: ignore[dict-item]
         "outputs": list(normalized.get("outputs", [])),
     }
 

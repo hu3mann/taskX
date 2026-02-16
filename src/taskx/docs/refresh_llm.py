@@ -123,10 +123,10 @@ def build_command_tree(app: typer.Typer) -> CommandNode:
             continue
         name = (group.name or "").strip()
         if name:
-            group_map[name] = group.typer_instance
+            group_map[name] = group.typer_instance  # type: ignore[assignment]
 
     for name in sorted(group_map):
-        nested = build_command_tree(group_map[name])
+        nested = build_command_tree(group_map[name])  # type: ignore[arg-type]
         children.append(CommandNode(name=name, children=nested.children))
 
     merged = _merge_nodes(children)
@@ -364,7 +364,9 @@ def _command_names(app: typer.Typer) -> set[str]:
     for command in app.registered_commands:
         if command.hidden:
             continue
-        name = command.name or command.callback.__name__.replace("_", "-")
+        callback = command.callback
+        callback_name = getattr(callback, "__name__", "") if callback else ""
+        name = command.name or callback_name.replace("_", "-")
         cleaned = name.strip()
         if cleaned:
             names.add(cleaned)
