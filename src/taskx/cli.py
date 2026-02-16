@@ -2611,6 +2611,142 @@ def doctor_cmd(
         raise typer.Exit(code=1) from e
 
 
+@cli.command()
+def upgrade(
+    version: str | None = typer.Option(
+        None,
+        "--version",
+        help="Target version to upgrade/downgrade to",
+    ),
+    latest: bool = typer.Option(
+        False,
+        "--latest",
+        help="Upgrade to the latest version from git remote",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Force re-installation",
+    ),
+) -> None:
+    """Upgrade TaskX in the current repository."""
+    from taskx.utils.repo import detect_repo_root
+
+    console.print("[cyan]TaskX Upgrade[/cyan]")
+
+    try:
+        # Detect repo root
+        try:
+            repo_info = detect_repo_root(Path.cwd())
+            repo_root = repo_info.root
+        except RuntimeError:
+            # Fallback for when we are not in a recognizable repo but might have .taskx-pin
+            # This mimics the bash script behavior
+            repo_root = Path.cwd()
+            console.print("[yellow]Warning: Could not detect repository root. Using current directory.[/yellow]")
+
+        pin_file = repo_root / ".taskx-pin"
+        if not pin_file.exists():
+            console.print(f"[bold red]Error:[/bold red] No .taskx-pin found at {repo_root}")
+            console.print("This command requires an existing installation managed by a pin file.")
+            raise typer.Exit(1)
+
+        # Parse pin file
+        pin_config = {}
+        with open(pin_file, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    pin_config[key.strip()] = value.strip()
+
+        install_method = pin_config.get("install", "git")
+        repo_url = pin_config.get("repo")
+        current_ref = pin_config.get("ref")
+        wheel_path = pin_config.get("path")
+
+        # Determine target ref
+        target_ref = current_ref
+        if version:
+            target_ref = version
+            # Implicitly switch to git if version is specified
+            install_method = "git"
+        elif latest:
+            if install_method != "git" or not repo_url:
+                console.print("[bold red]Error:[/bold red] --latest requires git install method with a valid repo URL")
+                raise typer.Exit(1)
+
+            console.print(f"Fetching latest tag from {repo_url}...")
+            try:
+                cmd = ["git", "ls-remote", "--tags", "--sort=v:refname", repo_url]
+                output = subprocess.check_output(cmd, stderr=subprocess.PIPE, text=True)
+                lines = output.strip().splitlines()
+                if not lines:
+                    console.print("[bold red]Error:[/bold red] No tags found")
+                    raise typer.Exit(1)
+                latest_tag = lines[-1].split("/")[-1]
+                console.print(f"Latest version: {latest_tag}")
+                target_ref = latest_tag
+            except subprocess.CalledProcessError as e:
+                console.print(f"[bold red]Error:[/bold red] Failed to fetch tags: {e}")
+                raise typer.Exit(1)
+
+        # Update pin file
+        console.print(f"Updating {pin_file}...")
+        with open(pin_file, "w", encoding="utf-8") as f:
+            if install_method == "git":
+                f.write(f"install=git\nrepo={repo_url or ''}\nref={target_ref}\n")
+            elif install_method == "wheel":
+                f.write(f"install=wheel\npath={wheel_path or ''}\n")
+
+        # Run pip install
+        console.print("Running pip install...")
+        pip_cmd = [sys.executable, "-m", "pip", "install", "--upgrade"]
+        if force:
+            pip_cmd.append("--force-reinstall")
+
+        if install_method == "git":
+            if not repo_url or not target_ref:
+                 console.print("[bold red]Error:[/bold red] Invalid git configuration in pin file")
+                 raise typer.Exit(1)
+            install_url = f"git+{repo_url}@{target_ref}"
+            pip_cmd.append(install_url)
+        elif install_method == "wheel":
+            if not wheel_path:
+                 console.print("[bold red]Error:[/bold red] Invalid wheel configuration in pin file")
+                 raise typer.Exit(1)
+            # Handle relative path
+            full_wheel_path = repo_root / wheel_path
+            if not full_wheel_path.exists():
+                 console.print(f"[bold red]Error:[/bold red] Wheel not found at {full_wheel_path}")
+                 raise typer.Exit(1)
+            pip_cmd.append(str(full_wheel_path))
+
+        try:
+            subprocess.check_call(pip_cmd)
+            console.print("[green]✓ Upgrade successful[/green]")
+        except subprocess.CalledProcessError as e:
+             console.print(f"[bold red]Error:[/bold red] Installation failed: {e}")
+             raise typer.Exit(1)
+
+        # Verify
+        try:
+            # We can't easily reload the module in-process to check version,
+            # but we can spawn a check.
+            verify_cmd = [sys.executable, "-c", "import taskx; print(f'TaskX Version: {taskx.__version__}')"]
+            subprocess.check_call(verify_cmd)
+        except subprocess.CalledProcessError:
+             console.print("[yellow]Warning: Post-install verification failed[/yellow]")
+
+    except typer.Exit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] Upgrade failed: {e}")
+        raise typer.Exit(1) from e
+
+
 @cli.command(name="ci-gate")
 def ci_gate_cmd(
     out: Path | None = typer.Option(

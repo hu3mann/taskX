@@ -81,14 +81,14 @@ Get up and running faster than you can say "idempotency."
 
 ### 1. Installation
 
-The easiest way to join the cult—err, project—is via pip:
+The easiest way to join the cult—err, project—is via the installer script:
 
 ```bash
-# Latest stable tag
-pip install "taskx @ git+ssh://git@github.com/OWNER/REPO.git@v0.1.0"
+# Latest stable version
+curl -fsSL https://raw.githubusercontent.com/hu3mann/taskX/main/scripts/install.sh | bash
 ```
 
-*Need a wheel, `requirements.txt`, or a unified installer script? Check the [Detailed Installation Guide](docs/INSTALL.md).*
+*Need manual installation or wheel support? Check the [Detailed Installation Guide](docs/INSTALL.md).*
 
 ### 2. The "Hello World" Loop
 
