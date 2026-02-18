@@ -12,60 +12,69 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
         with:
           python-version: "3.11"
-      
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras --dev
+
       - name: Extract version from tag
         id: get_version
         run: |
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
           echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
           echo "Tag version: $TAG_VERSION"
-      
+
       - name: Validate version consistency
         run: |
           TAG_VERSION="${{ steps.get_version.outputs.tag_version }}"
-          
+
           # Get version from pyproject.toml
-          PYPROJECT_VERSION=$(grep '^version = ' pyproject.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
+          PYPROJECT_VERSION=$(awk -F '"' '/^version = "/ {print $2; exit}' pyproject.toml)
           echo "pyproject.toml version: $PYPROJECT_VERSION"
-          
+
           # Get version from taskx.__version__
-          pip install -e . --quiet
-          TASKX_VERSION=$(python -c "import taskx; print(taskx.__version__)")
+          TASKX_VERSION=$(uv run python -c "import taskx; print(taskx.__version__)")
           echo "taskx.__version__: $TASKX_VERSION"
-          
+
           # Compare versions
           if [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ]; then
             echo "❌ Error: Tag version ($TAG_VERSION) does not match pyproject.toml ($PYPROJECT_VERSION)"
             exit 1
           fi
-          
+
           if [ "$TAG_VERSION" != "$TASKX_VERSION" ]; then
             echo "❌ Error: Tag version ($TAG_VERSION) does not match taskx.__version__ ($TASKX_VERSION)"
             exit 1
           fi
-          
+
           echo "✅ All versions match: $TAG_VERSION"
-      
+
       - name: Run unit tests
         run: |
-          python -m pytest -q
-      
+          uv run pytest -q
+
       - name: Build distribution packages
         run: |
-          bash scripts/taskx_build.sh
-      
+          uv build
+
       - name: Test wheel installation
         run: |
-          bash scripts/taskx_install_test.sh
+          python -m venv /tmp/taskx-install-test
+          source /tmp/taskx-install-test/bin/activate
+          pip install --upgrade pip
+          pip install dist/*.whl
+          taskx --help
+          deactivate
+          rm -rf /tmp/taskx-install-test
 
       - name: Smoke test from /tmp
         run: |
@@ -83,6 +92,13 @@ jobs:
           # Cleanup
           deactivate
           rm -rf /tmp/taskx-smoke-test
+
+      - name: Publish to PyPI
+        if: ${{ secrets.PYPI_API_TOKEN != '' }}
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          uv publish
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1

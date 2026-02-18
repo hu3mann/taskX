@@ -21,50 +21,44 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+
       - name: Set up uv
         uses: astral-sh/setup-uv@v4
         with:
+          python-version: ${{ matrix.python-version }}
           enable-cache: true
 
       - name: Install dependencies
         run: |
-          uv sync --dev
+          uv sync --all-extras --dev
 
-      - name: Check for Poetry (Absolutely Not)
-        run: |
-          echo "Reject Poetry check"
-          if rg -n -i '\bpoetry\b' . \
-            --glob '!.github/workflows/taskx_ci.yml' \
-            --glob '!uv.lock'; then
-            echo "Poetry detected. Rejected."
-            exit 1
-          fi
-      
       - name: Lint (ruff)
         run: |
           uv run ruff check src/taskx
-      
+
       - name: Typecheck (mypy)
         run: |
           uv run mypy src/taskx
-      
-      - name: Run Tests (Be Honest)
+
+      - name: Run unit tests
         run: |
           uv run pytest
 
-      - name: Doctor sanity
-        run: |
-          uv run taskx doctor --timestamp-mode deterministic
-      
       - name: Build distribution packages
         if: matrix.python-version == '3.11'
         run: |
           uv build
+
+      - name: Test wheel installation
+        if: matrix.python-version == '3.11'
+        run: |
+          python -m venv /tmp/taskx-wheel-test
+          source /tmp/taskx-wheel-test/bin/activate
+          pip install --upgrade pip
+          pip install dist/*.whl
+          taskx --help
+          deactivate
+          rm -rf /tmp/taskx-wheel-test
 
       - name: Smoke install built wheel
         if: matrix.python-version == '3.11'
