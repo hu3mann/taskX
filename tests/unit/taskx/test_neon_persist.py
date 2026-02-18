@@ -45,6 +45,7 @@ def test_persist_write_creates_backup_and_is_idempotent(tmp_path: Path) -> None:
     content1 = rc.read_text(encoding="utf-8")
     assert MARKER_BEGIN in content1
 
+    # Second call with identical settings should not change the file
     result2 = persist_rc_file(
         path=rc,
         neon="1",
@@ -54,8 +55,9 @@ def test_persist_write_creates_backup_and_is_idempotent(tmp_path: Path) -> None:
         dry_run=False,
         backup_suffix_fn=lambda: "TEST2",
     )
-    assert result2.backup_path is not None
-    assert result2.backup_path.exists()
+    # No backup is created when the file is unchanged (idempotent behavior)
+    assert result2.backup_path is None
+    assert not result2.changed
     assert rc.read_text(encoding="utf-8") == content1
 
 

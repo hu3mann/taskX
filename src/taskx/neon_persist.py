@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import difflib
 import os
-import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 MARKER_BEGIN = "# >>> TASKX NEON BEGIN >>>"
 MARKER_END = "# <<< TASKX NEON END <<<"
@@ -43,6 +42,15 @@ def apply_managed_block(contents: str, *, block: str, remove: bool) -> tuple[str
         return contents + prefix + block, True
 
     if begin_idx == -1 or end_idx == -1 or end_idx < begin_idx:
+        if begin_idx == -1 and end_idx != -1:
+            raise ValueError("Malformed TASKX NEON markers: begin marker missing.")
+        if end_idx == -1 and begin_idx != -1:
+            raise ValueError("Malformed TASKX NEON markers: end marker missing.")
+        if end_idx < begin_idx:
+            raise ValueError(
+                "Malformed TASKX NEON markers: markers found in wrong order (end before begin)."
+            )
+        # Fallback for any unexpected mismatch.
         raise ValueError("Malformed TASKX NEON markers (begin/end mismatch).")
 
     end_idx = end_idx + len(MARKER_END)
@@ -78,7 +86,15 @@ def _atomic_write(path: Path, content: str) -> None:
 
 
 def _default_backup_suffix() -> str:
-    return time.strftime("%Y%m%d%H%M%S")
+    """Generate a timestamp-based backup suffix with microsecond precision.
+
+    Uses format: YYYYMMDDHHMMSS_MMMMMM (e.g., 20260218074700_123456)
+    This prevents backup file collisions when persist_rc_file is called
+    multiple times within the same second.
+    """
+    import datetime
+    now = datetime.datetime.now()
+    return now.strftime("%Y%m%d%H%M%S") + f"_{now.microsecond:06d}"
 
 
 @dataclass(frozen=True)

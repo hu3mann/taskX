@@ -372,6 +372,16 @@ def neon_persist(
 ) -> None:
     """Persist neon env exports into a shell rc file (idempotent markers)."""
     if yes and dry_run:
+        if neon_enabled():
+            neon_console.print(
+                "[bold red]Refused:[/bold red] --yes and --dry-run are mutually exclusive. "
+                "Use either --yes to write changes or --dry-run to preview them."
+            )
+        else:
+            print(
+                "Refused: --yes and --dry-run are mutually exclusive. "
+                "Use either --yes to write changes or --dry-run to preview them."
+            )
         raise typer.Exit(2)
 
     if path is None:
@@ -446,14 +456,26 @@ def neon_persist(
 
     from taskx.neon_persist import persist_rc_file
 
-    result = persist_rc_file(
-        path=path,
-        neon=desired_neon,
-        theme=desired_theme,
-        strict=desired_strict,
-        remove=remove,
-        dry_run=not yes,
-    )
+    try:
+        result = persist_rc_file(
+            path=path,
+            neon=desired_neon,
+            theme=desired_theme,
+            strict=desired_strict,
+            remove=remove,
+            dry_run=not yes,
+        )
+    except ValueError as exc:
+        # Malformed markers in the rc file; present a friendly error instead of a traceback.
+        if neon_enabled():
+            neon_console.print(
+                f"[bold red]Error:[/bold red] Failed to update rc file {path} due to malformed markers."
+            )
+            neon_console.print(f"[dim]{exc}[/dim]")
+        else:
+            print(f"Error: Failed to update rc file {path} due to malformed markers.")
+            print(exc)
+        raise typer.Exit(1)
 
     if neon_enabled():
         neon_console.print(f"[bold]Target:[/bold] {result.path}")
