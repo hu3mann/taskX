@@ -1,15 +1,13 @@
-<div align="center">
+# TaskX is a deterministic task-packet execution kernel that plans one path or refuses with evidence.
 
-# ⚡ TaskX
-### The "No-Nonsense" Deterministic Task Engine
+## Guarantees
 
-[![Build Status](https://github.com/OWNER/REPO/actions/workflows/taskx_ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions)
-[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Strictness](https://img.shields.io/badge/strictness-high-red)](https://mypy-lang.org/)
+- Artifact-first: if it did not write an artifact, it did not happen.
+- Refusal-first: invalid or unsafe inputs produce a structured refusal with a stable exit code.
+- Deterministic: identical packet + declared inputs + TaskX version yields identical outputs.
+- Single-path: no hidden retries, no fallback runners, no background execution.
 
-**Offline-First • Deterministic • Auditable • Operator-Grade**
+## Install
 
 [Installation](docs/INSTALL.md) • [Release Guidelines](docs/RELEASE.md) • [Contributing](AGENTS.md)
 
@@ -95,87 +93,48 @@ curl -fsSL https://raw.githubusercontent.com/hu3mann/taskX/main/scripts/install.
 Let's run a loop. A loop creates tasks, runs them, checks them, and promotes them.
 
 ```bash
-# 1. Compile some tasks (MVP mode)
-taskx compile-tasks --mode mvp --max-packets 5
-
-# 2. Pick a task ID from the output (e.g., T001) and run it
-taskx run-task --task-id T001
-
-# 3. Check if you passed the gate
-taskx gate-allowlist --run ./out/runs/RUN_..._T001
-
-# 4. If you see green, promote it!
-taskx promote-run --run ./out/runs/RUN_..._T001
+python -m pip install taskx
+taskx --help
 ```
 
-### 3. The Doctor Is In
+See `docs/01_INSTALL.md` for developer workflows and testing.
 
-Something feels off? The doctor knows all.
+## 60-second example
 
 ```bash
-taskx doctor
+taskx route init --repo-root .
+cat > PACKET.md <<'EOF'
+# Packet
+ROUTER_HINTS:
+  risk: low
+EOF
+taskx route plan --repo-root . --packet PACKET.md
+ls -1 out/taskx_route/
 ```
 
-This runs a full diagnostic of your environment, checking dependencies, schema integrity, and even if your system clock is behaving (though we won't trust it anyway).
+Expected outputs:
 
----
+- `out/taskx_route/ROUTE_PLAN.json`
+- `out/taskx_route/ROUTE_PLAN.md`
+- `out/taskx_route/HANDOFF.md` (for handoff flows)
 
-## 🧰 The Toolkit
+## Docs
 
-TaskX is a CLI composed of sharp, single-purpose tools.
+- Overview: `docs/00_OVERVIEW.md`
+- Install: `docs/01_INSTALL.md`
+- Quickstart: `docs/02_QUICKSTART.md`
+- Architecture: `docs/10_ARCHITECTURE.md`
+- Public contract: `docs/11_PUBLIC_CONTRACT.md`
+- Router: `docs/12_ROUTER.md`
+- Task packet format: `docs/13_TASK_PACKET_FORMAT.md`
+- Project doctor: `docs/14_PROJECT_DOCTOR.md`
+- Worktrees and commit sequencing (maintainers): `docs/20_WORKTREES_COMMIT_SEQUENCING.md`
+- Case bundles (maintainers): `docs/21_CASE_BUNDLES.md`
+- Release (maintainers): `docs/90_RELEASE.md`
 
-| Command | Description |
-| :--- | :--- |
-| `compile-tasks` | Mines specs and fills the task queue. |
-| `run-task` | Hydrates a workspace and executes a packet. |
-| `collect-evidence` | Scrapes the run for claims and facts. |
-| `gate-allowlist` | The bouncer. Checks `diff` vs `allowlist`. |
-| `promote-run` | Mints a crypto-token of approval. |
-| `commit-run` | Stages files (and ONLY verified files). |
-| `doctor` | Self-diagnostic health check. |
+## Kernel vs ecosystem
 
----
+TaskX (kernel) validates packets, plans deterministically, executes one path (or emits a manual handoff), and writes canonical artifacts.
 
-## 🧩 Dopemux Integration
+Everything else (scheduling, orchestration, memory, UX) belongs in the ecosystem above the kernel.
 
-TaskX plays nicely with **Dopemux**, our state-of-the-art service multiplexer.
-
-If you are in a Dopemux environment, use the `dopemux` namespace for auto-discovery of paths:
-
-```bash
-taskx dopemux compile
-taskx dopemux run --task-id T002
-taskx dopemux gate
-```
-
-It's like magic, but deterministic.
-
----
-
-## � The Golden Rules
-
-1.  **Thou Shalt Not Touch Unlisted Files**: If it's not in the allowlist, it doesn't exist.
-2.  **Thou Shalt Not Trust `datetime.now()`**: Use `timestamp_mode="deterministic"` for release builds.
-3.  **Thou Shalt Commit Only Promoted Runs**: No token, no commit.
-
----
-
-## 🏗 Contributing
-
-We are strict but fair.
-
-- **Linting**: We use `ruff`.
-- **Typing**: We use `mypy --strict`.
-- **Tests**: We use `pytest` and require 100% pass rate.
-
-See [AGENTS.md](AGENTS.md) for the AI agent protocol.
-
----
-
-<div align="center">
-
-**[Report Bug](https://github.com/OWNER/REPO/issues)** • **[Request Feature](https://github.com/OWNER/REPO/issues)**
-
-<sub>Built with ☕ and paranoid rigor by the Dopemux contributors.</sub>
-
-</div>

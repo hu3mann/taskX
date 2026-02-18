@@ -2,7 +2,7 @@
 
 Canonical install and integration instructions live in:
 
-- `README_TASKX_INSTALL.md`
+- `01_INSTALL.md`
 
 This page is intentionally short to avoid drift. Use the README guide for:
 
@@ -11,3 +11,7 @@ This page is intentionally short to avoid drift. Use the README guide for:
 - `project upgrade` stabilization flow
 - `route` assisted routing commands
 - `pr open` assisted PR flow
+
+See also:
+
+- `02_QUICKSTART.md`

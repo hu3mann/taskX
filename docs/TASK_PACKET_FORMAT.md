@@ -1,6 +1,5 @@
-# Task Packet Format
+# Task Packet Format (Moved)
 
-## Commit Plan Execution Note
+Canonical packet format docs live in:
 
-If a `COMMIT PLAN` is present, TaskX requires execution via `taskx commit-sequence`.
-Manual commits are discouraged and may break determinism guarantees.
+- `13_TASK_PACKET_FORMAT.md`
