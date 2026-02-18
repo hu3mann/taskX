@@ -61,30 +61,15 @@ def run_export_flow(
     console.print(f"Export: wrote {final_path} (changed={changed})")
     return changed
 
-@app.command()
+@app.command(hidden=True)
 def compile(
     out_path: Path | None = typer.Option(None, "--out-path"),
     platform: str | None = typer.Option(None, "--platform"),
     model: str | None = typer.Option(None, "--model"),
 ) -> None:
-    """Compile operator prompt to ops/OUT_OPERATOR_SYSTEM_PROMPT.md."""
-    root = get_repo_root()
-    profile_path = root / "ops" / "operator_profile.yaml"
-    profile = load_profile(profile_path)
-    templates_dir = root / "ops" / "templates"
-
-    compiled = export_prompt(
-        profile,
-        templates_dir,
-        platform_override=platform,
-        model_override=model,
-        taskx_version=__version__,
-        git_hash=get_git_hash(),
-    )
-
-    final_path = out_path or (root / "ops" / "OUT_OPERATOR_SYSTEM_PROMPT.md")
-    changed = write_if_changed(final_path, compiled)
-    console.print(f"Compile: wrote {final_path} (changed={changed})")
+    """Deprecated compatibility alias for `taskx ops export`."""
+    console.print("[yellow]Deprecated:[/yellow] use `taskx ops export` instead of `taskx ops compile`.")
+    run_export_flow(export_path=out_path, platform=platform, model=model)
 
 @app.command()
 def init(

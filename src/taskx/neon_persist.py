@@ -55,6 +55,8 @@ def apply_managed_block(contents: str, *, block: str, remove: bool) -> tuple[str
         raise ValueError("Malformed TASKX NEON markers (begin/end mismatch).")
 
     end_idx = end_idx + len(MARKER_END)
+    while end_idx < len(contents) and contents[end_idx] == "\n":
+        end_idx += 1
 
     before = contents[:begin_idx]
     after = contents[end_idx:]
@@ -63,7 +65,7 @@ def apply_managed_block(contents: str, *, block: str, remove: bool) -> tuple[str
         new_contents = (before.rstrip("\n") + "\n" + after.lstrip("\n")).rstrip("\n") + "\n"
         return new_contents if new_contents != "\n" else "", True
 
-    new_contents = before + block + after.lstrip("\n")
+    new_contents = before + block + after
     return new_contents, new_contents != contents
 
 
@@ -129,8 +131,10 @@ def persist_rc_file(
     if dry_run:
         return PersistResult(path=path, changed=changed, diff=diff, backup_path=None)
 
+    if not changed:
+        return PersistResult(path=path, changed=False, diff=diff, backup_path=None)
+
     backup_path = path.with_name(f"{path.name}.taskx.bak.{backup_suffix_fn()}")
-    # Always create a backup, even if the file doesn't exist yet.
     try:
         _atomic_write(backup_path, old)
     except (OSError, PermissionError) as exc:
@@ -142,4 +146,3 @@ def persist_rc_file(
         raise OSError(f"Failed to write rc file {path}: {exc}") from exc
 
     return PersistResult(path=path, changed=changed, diff=diff, backup_path=backup_path)
-

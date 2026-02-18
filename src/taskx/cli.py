@@ -149,6 +149,7 @@ cli = typer.Typer(
 )
 if ops_app:
     cli.add_typer(ops_app, name="ops")
+app = cli
 console = Console()
 
 neon_app = typer.Typer(help="Neon terminal cosmetics (console-only). Artifacts stay sterile.")
@@ -1001,7 +1002,7 @@ def print_runtime_origin() -> None:
     raise typer.Exit(0)
 
 
-class InitTier(str, Enum):
+class InitTier(StrEnum):
     """Bootstrap tier controlling what ``taskx init`` sets up."""
 
     OPS = "ops"
