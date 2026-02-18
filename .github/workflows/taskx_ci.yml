@@ -65,6 +65,11 @@ jobs:
         run: |
           uv build
 
+      - name: Verify deterministic wheel hashes
+        if: matrix.python-version == '3.11'
+        run: |
+          bash scripts/check_build_determinism.sh
+
       - name: Smoke install built wheel
         if: matrix.python-version == '3.11'
         run: |
