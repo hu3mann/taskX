@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 
 import typer
-import yaml
+import yaml  # type: ignore[import-untyped]
 from rich.console import Console
 
 from taskx import __version__

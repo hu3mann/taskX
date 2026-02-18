@@ -783,7 +783,7 @@ def init_cmd(
 
         profile_path = ops_dir / "operator_profile.yaml"
         if not profile_path.exists():
-            import yaml
+            import yaml  # type: ignore[import-untyped]
 
             profile = {
                 "project": {
