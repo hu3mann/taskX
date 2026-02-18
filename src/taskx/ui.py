@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import os
+import tempfile
 import time
 from dataclasses import dataclass
 from itertools import cycle
@@ -243,10 +244,26 @@ def neon_rc_unified_diff(old: str, new: str, *, path: Path) -> str:
 
 
 def _atomic_write(path: Path, content: str) -> None:
+    """Write file atomically using a unique temp file to avoid race conditions."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.taskx.tmp")
-    tmp.write_text(content, encoding="utf-8")
-    os.replace(tmp, path)
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            delete=False,
+            prefix=f".{path.name}.",
+            suffix=".taskx.tmp",
+        ) as handle:
+            handle.write(content)
+            temp_path = Path(handle.name)
+        temp_path.replace(path)
+    except Exception:
+        # Clean up temp file on failure
+        if temp_path and temp_path.exists():
+            temp_path.unlink()
+        raise
 
 
 @dataclass(frozen=True)
