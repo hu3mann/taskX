@@ -25,3 +25,7 @@ Note: `taskx ops doctor` exports the operator prompt by default unless `--no-exp
 
 This export does not affect packet routing or execution behavior. It exists to make operator context observable.
 
+See also:
+
+- Router: `12_ROUTER.md`
+- Architecture: `10_ARCHITECTURE.md`

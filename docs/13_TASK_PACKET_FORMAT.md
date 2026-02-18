@@ -1,37 +1,58 @@
 # Task Packet Format
 
-This document defines what "packet" means for TaskX.
+This document defines what "Task Packet" means for TaskX and what the parser enforces.
 
-## Schema versioning
+## Header
 
-- Packets are versioned by an explicit schema version field when present.
-- Backward-compatible additions are allowed in minor versions.
-- Contract-breaking changes require a major version bump.
+The first line must be an H1 of the form:
 
-## Required vs optional fields
-
-At minimum, a packet must provide:
-
-- A stable identity (or a stable file path used as identity)
-- Declared steps in an explicit order (when applicable)
-- Declared execution mode (`auto` or `manual`) when applicable
-
-Optional fields include:
-
-- Routing hints
-- Policy overrides (explicitly declared)
-
-## Examples
-
-Minimal router packet:
-
-```markdown
-# Packet
-ROUTER_HINTS:
-  risk: low
+```text
+# TASK_PACKET TP_#### — Title
 ```
 
-Refusal example (missing availability config):
+Where:
 
-- `taskx route plan` refuses with exit code `2` and writes refusal reasons into route plan artifacts.
+- `TP_####` is exactly four digits.
+- The separator is an em dash in the spec text; the parser matches a literal " — " sequence.
+
+## Required sections
+
+Task Packets are parsed as `##` headings. The following sections are required:
+
+- `GOAL`
+- `SCOPE (ALLOWLIST)`
+- `NON-NEGOTIABLES`
+- `REQUIRED CHANGES`
+- `VERIFICATION COMMANDS`
+- `DEFINITION OF DONE`
+- `SOURCES`
+
+If any section is missing, parsing fails.
+
+## Allowlist rules
+
+The allowlist is extracted from `SCOPE (ALLOWLIST)` as a markdown bullet list.
+
+- Only bullet items are considered.
+- Backticks around paths are allowed.
+- The allowlist must be non-empty.
+
+## Verification commands rules
+
+`VERIFICATION COMMANDS` must contain at least one command, extracted from:
+
+1. A fenced code block (preferred), or
+2. A bullet list
+
+If no commands are found, parsing fails.
+
+## Project identity (optional)
+
+If a packet includes a `PROJECT IDENTITY` section, it is parsed for key/value items.
+Some repositories may require this header (see project identity rails).
+
+## Compatibility and versioning policy
+
+- Additive changes to the packet format should be backward-compatible.
+- Contract-breaking changes require a major version bump of TaskX.
 
