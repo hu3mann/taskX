@@ -37,8 +37,8 @@ def test_doctor_statuses_flash(tmp_path):
         (templates_dir / "lab_boundary.md").write_text("# LAB\n")
         (templates_dir / "overlays" / "chatgpt.md").write_text("# OPT\n")
         
-        runner.invoke(taskx.ops.cli.app, ["compile"])
-        compiled_path = ops_dir / "OUT_OPERATOR_SYSTEM_PROMPT.md"
+        runner.invoke(taskx.ops.cli.app, ["export"])
+        compiled_path = ops_dir / "EXPORTED_OPERATOR_PROMPT.md"
         assert compiled_path.exists()
         compiled_content = compiled_path.read_text()
         compiled_hash = calculate_hash(compiled_content)
@@ -51,11 +51,9 @@ def test_doctor_statuses_flash(tmp_path):
         assert "canonical_target=CLAUDE.md" in result.stdout
         
         # 4. BLOCK_STALE
-        # Change a template without re-compiling/applying
+        # Change a template without re-exporting/applying
         (templates_dir / "base_supervisor.md").write_text("# STALE\n")
-        # compiled_hash should change if it re-compiles in doctor (it does if OUT... doesn't exist OR if we use the logic in doctor)
-        # Wait, doctor.py uses OUT... if it exists.
-        # If we didn't re-compile, OUT... still has the old content.
+        # compiled_hash should change if doctor computes current prompt after export is missing.
         # But wait, doctor.py:
         # if compiled_path.exists(): report["compiled_hash"] = calculate_hash(compiled_path.read_text())
         compiled_path.unlink()
