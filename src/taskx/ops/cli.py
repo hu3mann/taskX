@@ -66,7 +66,7 @@ def compile(
     out_path: Path | None = typer.Option(None, "--out-path"),
     platform: str | None = typer.Option(None, "--platform"),
     model: str | None = typer.Option(None, "--model"),
-):
+) -> None:
     """Compile operator prompt to ops/OUT_OPERATOR_SYSTEM_PROMPT.md."""
     root = get_repo_root()
     profile_path = root / "ops" / "operator_profile.yaml"
