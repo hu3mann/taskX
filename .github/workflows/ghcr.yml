@@ -47,6 +47,9 @@ jobs:
             --tag "${{ steps.image.outputs.name }}:latest" \
             .
 
+      - name: Smoke test container
+        run: docker run --rm "${{ steps.image.outputs.name }}:${{ github.ref_name }}" --version
+
       - name: Push container image
         run: |
           docker push "${{ steps.image.outputs.name }}:${{ github.ref_name }}"
