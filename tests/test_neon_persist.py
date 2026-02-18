@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from taskx.ui import (
     NEON_RC_MARKER_BEGIN,
     NEON_RC_MARKER_END,
@@ -92,3 +94,55 @@ def test_backup_created_only_on_mutation(tmp_path: Path) -> None:
 
     second = persist_neon_rc_file(path=rc, theme="mintwave", remove=False, dry_run=False)
     assert second.backup_path is None
+
+
+def test_error_on_missing_begin_marker(tmp_path: Path) -> None:
+    """Test that missing begin marker raises ValueError."""
+    rc = tmp_path / "shellrc"
+    rc.write_text(f"export KEEP=1\n{NEON_RC_MARKER_END}\n", encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc_info:
+        persist_neon_rc_file(path=rc, theme="mintwave", remove=False, dry_run=False)
+    
+    assert "begin marker missing" in str(exc_info.value)
+
+
+def test_error_on_missing_end_marker(tmp_path: Path) -> None:
+    """Test that missing end marker raises ValueError."""
+    rc = tmp_path / "shellrc"
+    rc.write_text(f"export KEEP=1\n{NEON_RC_MARKER_BEGIN}\n", encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc_info:
+        persist_neon_rc_file(path=rc, theme="mintwave", remove=False, dry_run=False)
+    
+    assert "end marker missing" in str(exc_info.value)
+
+
+def test_error_on_multiple_begin_markers(tmp_path: Path) -> None:
+    """Test that multiple begin markers raise ValueError."""
+    rc = tmp_path / "shellrc"
+    rc.write_text(
+        f"{NEON_RC_MARKER_BEGIN}\nexport TASKX_NEON=1\n{NEON_RC_MARKER_END}\n"
+        f"{NEON_RC_MARKER_BEGIN}\nexport TASKX_NEON=1\n{NEON_RC_MARKER_END}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        persist_neon_rc_file(path=rc, theme="mintwave", remove=False, dry_run=False)
+    
+    assert "Multiple TASKX NEON begin markers found" in str(exc_info.value)
+
+
+def test_error_on_multiple_end_markers(tmp_path: Path) -> None:
+    """Test that multiple end markers raise ValueError."""
+    rc = tmp_path / "shellrc"
+    rc.write_text(
+        f"{NEON_RC_MARKER_BEGIN}\nexport TASKX_NEON=1\n{NEON_RC_MARKER_END}\n"
+        f"{NEON_RC_MARKER_END}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        persist_neon_rc_file(path=rc, theme="mintwave", remove=False, dry_run=False)
+    
+    assert "Multiple TASKX NEON end markers found" in str(exc_info.value)
