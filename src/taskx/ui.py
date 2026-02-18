@@ -243,10 +243,26 @@ def neon_rc_unified_diff(old: str, new: str, *, path: Path) -> str:
 
 
 def _atomic_write(path: Path, content: str) -> None:
+    import tempfile
+    
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.taskx.tmp")
-    tmp.write_text(content, encoding="utf-8")
-    os.replace(tmp, path)
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            delete=False,
+            prefix=f".{path.name}.",
+            suffix=".taskx.tmp",
+        ) as tmp_file:
+            tmp_file.write(content)
+            tmp_path = Path(tmp_file.name)
+        os.replace(tmp_path, path)
+    except Exception:
+        # Clean up temp file if it exists
+        if "tmp_path" in locals() and tmp_path.exists():
+            tmp_path.unlink()
+        raise
 
 
 @dataclass(frozen=True)
