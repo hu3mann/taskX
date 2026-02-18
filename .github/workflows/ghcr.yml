@@ -1,0 +1,53 @@
+name: Container Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish-container:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Build wheel for image
+        run: uv build
+
+      - name: Compute image name
+        id: image
+        run: |
+          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "name=ghcr.io/${OWNER}/taskx" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build container image
+        run: |
+          docker build \
+            --tag "${{ steps.image.outputs.name }}:${{ github.ref_name }}" \
+            --tag "${{ steps.image.outputs.name }}:latest" \
+            .
+
+      - name: Push container image
+        run: |
+          docker push "${{ steps.image.outputs.name }}:${{ github.ref_name }}"
+          docker push "${{ steps.image.outputs.name }}:latest"
