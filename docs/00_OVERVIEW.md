@@ -2,11 +2,6 @@
 
 TaskX is a deterministic execution kernel for task packets.
 
-It is artifact-first and refusal-first:
-
-- If it cannot proceed under declared policy, it refuses with evidence.
-- If it did not write an artifact, it did not happen.
-
 ## Kernel vs ecosystem
 
 The kernel:
@@ -22,7 +17,7 @@ The ecosystem may add scheduling, orchestration, UI, or memory. Those are intent
 
 - Deterministic planning and artifact writing for identical inputs and version.
 - Stable refusal semantics with evidence.
-- No hidden retries or fallback execution paths.
+- Explicit, one-path execution decisions.
 
 ## Non-goals
 
@@ -36,4 +31,3 @@ The ecosystem may add scheduling, orchestration, UI, or memory. Those are intent
 - Public contract: `11_PUBLIC_CONTRACT.md`
 - Install: `01_INSTALL.md`
 - Quickstart: `02_QUICKSTART.md`
-
