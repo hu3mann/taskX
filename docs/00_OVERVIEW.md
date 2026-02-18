@@ -2,38 +2,32 @@
 
 TaskX is a deterministic execution kernel for task packets.
 
-It is artifact-first and refusal-first:
+## What it is
 
-- If it cannot proceed under declared policy, it refuses with evidence.
-- If it did not write an artifact, it did not happen.
+TaskX enforces a narrow contract:
 
-## Kernel vs ecosystem
+- determinism for planning and execution artifacts
+- refusal when policy, scope, or evidence constraints are violated
+- artifacts as the source of truth for what happened
+- one path in auto mode, or an explicit handoff in manual mode
 
-The kernel:
+## What it is not
 
-- Validates inputs (task packets and declared config).
-- Produces a deterministic plan or a deterministic refusal.
-- Executes exactly one selected path in `auto` mode (or emits a handoff in `manual` mode).
-- Writes canonical artifacts before exit.
+TaskX is not a generic orchestration platform. It does not provide hidden retries, implicit fallbacks, or background side effects.
 
-The ecosystem may add scheduling, orchestration, UI, or memory. Those are intentionally out of scope for the kernel.
+## Kernel boundary
 
-## Promises
+The kernel validates inputs, selects one deterministic route, executes that route, and exits after writing canonical artifacts.
 
-- Deterministic planning and artifact writing for identical inputs and version.
-- Stable refusal semantics with evidence.
-- No hidden retries or fallback execution paths.
+Scheduling, memory, UX layers, and long-running orchestration belong to external systems.
 
-## Non-goals
+## Operating promise
 
-- Being a general-purpose workflow engine.
-- Implicit network access.
-- Cross-run mutable state.
+Given the same packet, declared inputs, and TaskX version, output artifacts and refusal behavior are stable.
 
-## Next
+## Next docs
 
-- Architecture: `10_ARCHITECTURE.md`
-- Public contract: `11_PUBLIC_CONTRACT.md`
-- Install: `01_INSTALL.md`
-- Quickstart: `02_QUICKSTART.md`
-
+- `10_ARCHITECTURE.md`
+- `11_PUBLIC_CONTRACT.md`
+- `13_TASK_PACKET_FORMAT.md`
+- `20_WORKTREES_COMMIT_SEQUENCING.md`
