@@ -107,9 +107,11 @@ def persist_rc_file(
     if dry_run:
         return PersistResult(path=path, changed=changed, diff=diff, backup_path=None)
 
-    backup_path = path.with_name(f"{path.name}.taskx.bak.{backup_suffix_fn()}")
-    # Always create a backup, even if the file doesn't exist yet.
-    _atomic_write(backup_path, old)
+    backup_path: Path | None = None
+    if changed:
+        # Create a backup of the previous contents before modifying the file.
+        backup_path = path.with_name(f"{path.name}.taskx.bak.{backup_suffix_fn()}")
+        _atomic_write(backup_path, old)
     _atomic_write(path, new)
     return PersistResult(path=path, changed=changed, diff=diff, backup_path=backup_path)
 
