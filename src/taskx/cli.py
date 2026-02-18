@@ -351,6 +351,15 @@ def neon_persist(
     ),
 ) -> None:
     """Persist neon env exports into a shell rc file (idempotent markers)."""
+    # Validate shell parameter if provided
+    if shell is not None and shell not in ("zsh", "bash"):
+        if neon_enabled():
+            neon_console.print(f"[bold red]Refused:[/bold red] invalid shell '{shell}'")
+            neon_console.print("Valid options: zsh, bash")
+        else:
+            print(f"Refused: invalid shell '{shell}'. Valid options: zsh, bash")
+        raise typer.Exit(2)
+
     if rc_path is None:
         resolved_shell: str | None = None
         shell_env = os.environ.get("SHELL", "")

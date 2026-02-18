@@ -171,3 +171,52 @@ def test_neon_status_works_with_neon_disabled(monkeypatch) -> None:
     assert "TASKX_NEON=0" in result.output
     assert "TASKX_STRICT=0" in result.output
     assert "TASKX_THEME=cyberpunk" in result.output
+
+
+# neon persist tests
+
+
+def test_neon_persist_invalid_shell_neon_enabled(monkeypatch, tmp_path) -> None:
+    """neon persist exits with error for invalid --shell value (neon on)."""
+    monkeypatch.setenv("TASKX_NEON", "1")
+    rc_file = tmp_path / "testrc"
+    rc_file.touch()
+
+    result = runner.invoke(cli, ["neon", "persist", "--shell", "fish", "--rc-path", str(rc_file)])
+    assert result.exit_code == 2
+    assert "invalid shell" in result.output
+    assert "fish" in result.output
+    assert "Valid options: zsh, bash" in result.output
+
+
+def test_neon_persist_invalid_shell_neon_disabled(monkeypatch, tmp_path) -> None:
+    """neon persist exits with error for invalid --shell value (neon off)."""
+    monkeypatch.setenv("TASKX_NEON", "0")
+    rc_file = tmp_path / "testrc"
+    rc_file.touch()
+
+    result = runner.invoke(cli, ["neon", "persist", "--shell", "ksh", "--rc-path", str(rc_file)])
+    assert result.exit_code == 2
+    assert "invalid shell" in result.output
+    assert "ksh" in result.output
+    assert "Valid options: zsh, bash" in result.output
+
+
+def test_neon_persist_valid_shell_zsh(monkeypatch, tmp_path) -> None:
+    """neon persist accepts --shell zsh."""
+    monkeypatch.setenv("TASKX_NEON", "1")
+    rc_file = tmp_path / "testrc"
+    rc_file.touch()
+
+    result = runner.invoke(cli, ["neon", "persist", "--shell", "zsh", "--rc-path", str(rc_file)])
+    assert result.exit_code == 0
+
+
+def test_neon_persist_valid_shell_bash(monkeypatch, tmp_path) -> None:
+    """neon persist accepts --shell bash."""
+    monkeypatch.setenv("TASKX_NEON", "1")
+    rc_file = tmp_path / "testrc"
+    rc_file.touch()
+
+    result = runner.invoke(cli, ["neon", "persist", "--shell", "bash", "--rc-path", str(rc_file)])
+    assert result.exit_code == 0
