@@ -359,7 +359,7 @@ def neon_persist(
         else:
             print(f"Refused: invalid shell '{shell}'. Valid options: zsh, bash")
         raise typer.Exit(2)
-    
+
     if rc_path is None:
         resolved_shell: str | None = None
         shell_env = os.environ.get("SHELL", "")
