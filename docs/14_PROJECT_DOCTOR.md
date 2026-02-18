@@ -1,31 +1,74 @@
 # Project Doctor
 
-The project doctor inspects a repository and reports integrity status. It does not mutate project state.
+Audience: Maintainers
+Status: Diagnostic Control Layer
 
-## PASS/WARN/FAIL semantics
+The Doctor does not comfort you.
 
-- PASS: exit `0`
-- WARN: exit `0` (diagnostic warnings)
-- FAIL: non-zero exit (stable)
+The Doctor inspects.
+The Doctor diagnoses.
+The Doctor reports.
 
-## What doctor checks
+And if something is wrong, the Doctor does not whisper.
 
-- Project mode and identity rails
-- Expected file layout for the selected mode
-- Config consistency
+---
 
-## What doctor never does
+## What the Doctor Checks
 
-- It never mutates packet execution behavior.
-- It never modifies repository files unless explicitly running a fix mode.
+- Instruction block integrity
+- Duplicate operator markers
+- Configuration drift
+- Missing required files
+- Structural contradictions
 
-## Operator prompt export policy (Policy A)
+It does not "fix" silently.
+It does not "helpfully correct."
 
-Note: `taskx ops doctor` exports the operator prompt by default unless `--no-export` is set.
+It observes.
+It reports.
+It exits with intent.
 
-This export does not affect packet routing or execution behavior. It exists to make operator context observable.
+---
 
-See also:
+## Exit Codes
 
-- Router: `12_ROUTER.md`
-- Architecture: `10_ARCHITECTURE.md`
+- PASS -> 0
+- WARN -> 0
+- FAIL -> non-zero (stable, deterministic)
+
+FAIL does not mean chaos.
+FAIL means: "Not acceptable."
+
+---
+
+## Export Behavior
+
+By default, the Doctor exports diagnostic artifacts.
+
+Even on FAIL.
+
+Why?
+Because evidence matters.
+Silence is not discipline.
+
+If you disable export, you are opting out of receipts.
+
+---
+
+## What the Doctor Will Never Do
+
+- modify packet execution behavior
+- retry validation
+- silently rewrite files
+- mask conflicts
+- introduce nondeterminism
+
+The Doctor does not negotiate with entropy.
+
+---
+
+## Philosophy
+
+The Doctor does not shame you.
+
+But it will absolutely document your mistakes.
