@@ -1001,7 +1001,7 @@ def print_runtime_origin() -> None:
     raise typer.Exit(0)
 
 
-class InitTier(str, Enum):
+class InitTier(StrEnum):
     """Bootstrap tier controlling what ``taskx init`` sets up."""
 
     OPS = "ops"
