@@ -264,3 +264,65 @@ def test_worship_outputs_plain_when_neon_disabled(capsys, monkeypatch) -> None:
     assert "Leave artifacts. No excuses." in captured.out
     assert "One path. Stay honest." in captured.out
     assert "Refusal is integrity." in captured.out
+
+
+# Programmatic theme validation tests
+
+
+def test_render_neon_rc_block_rejects_invalid_theme() -> None:
+    """Test that render_neon_rc_block validates theme to prevent shell injection."""
+    from taskx.ui import render_neon_rc_block
+
+    # Test shell injection attempt via command substitution
+    with pytest.raises(ValueError) as exc_info:
+        render_neon_rc_block(theme="evil$(whoami)")
+    assert "Unknown theme: 'evil$(whoami)'" in str(exc_info.value)
+    assert "Valid themes:" in str(exc_info.value)
+
+    # Test shell injection attempt via semicolon
+    with pytest.raises(ValueError) as exc_info:
+        render_neon_rc_block(theme="malicious; rm -rf /")
+    assert "Unknown theme:" in str(exc_info.value)
+
+    # Verify valid theme works
+    block = render_neon_rc_block(theme="mintwave")
+    assert 'export TASKX_THEME="mintwave"' in block
+
+
+def test_persist_neon_rc_file_rejects_invalid_theme(tmp_path) -> None:
+    """Test that persist_neon_rc_file validates theme to prevent shell injection."""
+    from taskx.ui import persist_neon_rc_file
+
+    rc = tmp_path / "rc"
+
+    # Test shell injection attempt via command substitution
+    with pytest.raises(ValueError) as exc_info:
+        persist_neon_rc_file(
+            path=rc,
+            theme="evil$(whoami)",
+            remove=False,
+            dry_run=True,
+        )
+    assert "Unknown theme: 'evil$(whoami)'" in str(exc_info.value)
+    assert "Valid themes:" in str(exc_info.value)
+    assert not rc.exists()  # File should not be created
+
+    # Test shell injection attempt via semicolon
+    with pytest.raises(ValueError) as exc_info:
+        persist_neon_rc_file(
+            path=rc,
+            theme="malicious; rm -rf /",
+            remove=False,
+            dry_run=True,
+        )
+    assert "Unknown theme:" in str(exc_info.value)
+    assert not rc.exists()
+
+    # Verify valid theme works
+    result = persist_neon_rc_file(
+        path=rc,
+        theme="mintwave",
+        remove=False,
+        dry_run=True,
+    )
+    assert result.changed

@@ -62,6 +62,7 @@ from taskx.ui import (
     console as neon_console,
     get_theme_name,
     neon_enabled,
+    persist_neon_rc_file,
     render_banner,
     should_show_banner,
     sleep_ms,
@@ -322,15 +323,16 @@ def neon_status() -> None:
 
 @neon_app.command("persist")
 def neon_persist(
-    shell: str = typer.Option(
-        "auto",
-        "--shell",
-        help="Target shell rc format: zsh, bash, or auto (infer from $SHELL).",
-    ),
-    path: Path | None = typer.Option(
+    shell: str | None = typer.Option(
         None,
+        "--shell",
+        help="Target shell: zsh or bash (defaults to inferred $SHELL).",
+    ),
+    rc_path: Path | None = typer.Option(
+        None,
+        "--rc-path",
         "--path",
-        help="Override rc file path (otherwise derived from --shell).",
+        help="Override rc file path (otherwise derived from shell).",
     ),
     remove: bool = typer.Option(
         False,
@@ -338,80 +340,48 @@ def neon_persist(
         help="Remove the managed TASKX NEON block.",
     ),
     dry_run: bool = typer.Option(
-        True,
-        "--dry-run",
-        help="Print a unified diff and do not write.",
-    ),
-    yes: bool = typer.Option(
         False,
-        "--yes",
-        help="Write changes to disk (creates timestamped backup).",
+        "--dry-run",
+        help="Do not write any changes (dry run mode).",
     ),
     theme: str | None = typer.Option(
         None,
         "--theme",
         help="Theme override (default: TASKX_THEME or mintwave).",
     ),
-    neon: int | None = typer.Option(
-        None,
-        "--neon",
-        help="Override TASKX_NEON (0 or 1).",
-    ),
-    strict: int | None = typer.Option(
-        None,
-        "--strict",
-        help="Override TASKX_STRICT (0 or 1).",
-    ),
 ) -> None:
     """Persist neon env exports into a shell rc file (idempotent markers)."""
-    if yes and dry_run:
+    # Validate shell parameter if provided
+    if shell is not None and shell not in ("zsh", "bash"):
         if neon_enabled():
-            neon_console.print(
-                "[bold red]Refused:[/bold red] --yes and --dry-run are mutually exclusive. "
-                "Use either --yes to write changes or --dry-run to preview them."
-            )
+            neon_console.print(f"[bold red]Refused:[/bold red] invalid shell '{shell}'")
+            neon_console.print("Valid options: zsh, bash")
         else:
-            print(
-                "Refused: --yes and --dry-run are mutually exclusive. "
-                "Use either --yes to write changes or --dry-run to preview them."
-            )
+            print(f"Refused: invalid shell '{shell}'. Valid options: zsh, bash")
         raise typer.Exit(2)
 
-    if path is None:
-        resolved_shell = shell
-        if resolved_shell == "auto":
-            shell_env = os.environ.get("SHELL", "")
-            if shell_env.endswith("zsh"):
-                resolved_shell = "zsh"
-            elif shell_env.endswith("bash"):
-                resolved_shell = "bash"
-            else:
-                if neon_enabled():
-                    neon_console.print("[bold red]Refused:[/bold red] unable to infer shell from $SHELL.")
-                    neon_console.print("Provide --shell zsh|bash or --path /path/to/rcfile")
-                else:
-                    print("Refused: unable to infer shell from $SHELL. Provide --shell zsh|bash or --path.")
-                raise typer.Exit(2)
+    if rc_path is None:
+        resolved_shell: str | None = None
+        shell_env = os.environ.get("SHELL", "")
+        if shell_env.endswith("zsh"):
+            resolved_shell = "zsh"
+        elif shell_env.endswith("bash"):
+            resolved_shell = "bash"
+        if shell is not None:
+            resolved_shell = shell
 
         if resolved_shell == "zsh":
-            path = Path.home() / ".zshrc"
+            rc_path = Path.home() / ".zshrc"
         elif resolved_shell == "bash":
-            path = Path.home() / ".bashrc"
+            rc_path = Path.home() / ".bashrc"
         else:
             if neon_enabled():
-                neon_console.print(
-                    f"[bold red]Refused:[/bold red] unsupported shell '{resolved_shell}'."
-                )
-                neon_console.print("Provide --shell zsh|bash or --path /path/to/rcfile")
+                neon_console.print("[bold red]Refused:[/bold red] unable to determine shell rc target.")
+                neon_console.print("Use --shell zsh|bash or --rc-path /path/to/rcfile")
             else:
-                print(
-                    f"Refused: unsupported shell '{resolved_shell}'. "
-                    "Provide --shell zsh|bash or --path /path/to/rcfile."
-                )
+                print("Refused: unable to determine shell rc target. Use --shell or --rc-path.")
             raise typer.Exit(2)
 
-    desired_neon = str(neon) if neon is not None else os.getenv("TASKX_NEON", "1")
-    desired_strict = str(strict) if strict is not None else os.getenv("TASKX_STRICT", "0")
     desired_theme = theme or os.getenv("TASKX_THEME", "mintwave")
 
     # Validate theme against known themes to prevent shell injection
@@ -424,39 +394,12 @@ def neon_persist(
             print("Try: taskx neon list")
         raise typer.Exit(2)
 
-    if desired_neon not in ("0", "1") or desired_strict not in ("0", "1"):
-        if neon_enabled():
-            if desired_neon not in ("0", "1"):
-                neon_console.print(
-                    f"[bold red]Refused:[/bold red] invalid TASKX_NEON value {desired_neon!r}. "
-                    "Expected '0' or '1'."
-                )
-            if desired_strict not in ("0", "1"):
-                neon_console.print(
-                    f"[bold red]Refused:[/bold red] invalid TASKX_STRICT value {desired_strict!r}. "
-                    "Expected '0' or '1'."
-                )
-        else:
-            if desired_neon not in ("0", "1"):
-                print(
-                    f"Refused: invalid TASKX_NEON value {desired_neon!r}. Expected '0' or '1'."
-                )
-            if desired_strict not in ("0", "1"):
-                print(
-                    f"Refused: invalid TASKX_STRICT value {desired_strict!r}. Expected '0' or '1'."
-                )
-        raise typer.Exit(2)
-
-    from taskx.neon_persist import persist_rc_file
-
     try:
-        result = persist_rc_file(
-            path=path,
-            neon=desired_neon,
+        result = persist_neon_rc_file(
+            path=rc_path,
             theme=desired_theme,
-            strict=desired_strict,
             remove=remove,
-            dry_run=not yes,
+            dry_run=dry_run,
         )
     except OSError as exc:
         if neon_enabled():
@@ -467,10 +410,10 @@ def neon_persist(
 
     if neon_enabled():
         neon_console.print(f"[bold]Target:[/bold] {result.path}")
-        neon_console.print("[dim]Mode: dry-run[/dim]" if not yes else "[dim]Mode: write[/dim]")
+        neon_console.print("[dim]Mode: dry-run[/dim]" if dry_run else "[dim]Mode: write[/dim]")
     else:
         print(f"Target: {result.path}")
-        print("Mode: dry-run" if not yes else "Mode: write")
+        print("Mode: dry-run" if dry_run else "Mode: write")
 
     if result.diff:
         print(result.diff, end="" if result.diff.endswith("\n") else "\n")

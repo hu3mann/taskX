@@ -116,7 +116,7 @@ def test_malformed_markers_refuse(tmp_path: Path) -> None:
             remove=False,
             dry_run=True,
         )
-    
+
     assert "end marker missing" in str(exc_info.value)
 
 
@@ -195,4 +195,60 @@ def test_write_permission_error_raises_oserror(tmp_path: Path) -> None:
     finally:
         # Restore permissions for cleanup
         os.chmod(tmp_path, 0o755)
+
+
+def test_render_block_rejects_invalid_theme() -> None:
+    """Test that render_block validates theme to prevent shell injection."""
+    with pytest.raises(ValueError) as exc_info:
+        render_block(neon="1", theme="evil$(whoami)", strict="0")
+    assert "Unknown theme: 'evil$(whoami)'" in str(exc_info.value)
+    assert "Valid themes:" in str(exc_info.value)
+
+    with pytest.raises(ValueError) as exc_info:
+        render_block(neon="1", theme="malicious; rm -rf /", strict="0")
+    assert "Unknown theme:" in str(exc_info.value)
+
+
+def test_persist_rc_file_rejects_invalid_theme(tmp_path: Path) -> None:
+    """Test that persist_rc_file validates theme to prevent shell injection."""
+    rc = tmp_path / "rc"
+
+    # Test shell injection attempt via command substitution
+    with pytest.raises(ValueError) as exc_info:
+        persist_rc_file(
+            path=rc,
+            neon="1",
+            theme="evil$(whoami)",
+            strict="0",
+            remove=False,
+            dry_run=True,
+        )
+    assert "Unknown theme: 'evil$(whoami)'" in str(exc_info.value)
+    assert "Valid themes:" in str(exc_info.value)
+    assert not rc.exists()  # File should not be created
+
+    # Test shell injection attempt via semicolon
+    with pytest.raises(ValueError) as exc_info:
+        persist_rc_file(
+            path=rc,
+            neon="1",
+            theme="malicious; rm -rf /",
+            strict="0",
+            remove=False,
+            dry_run=True,
+        )
+    assert "Unknown theme:" in str(exc_info.value)
+    assert not rc.exists()
+
+    # Verify valid theme works
+    result = persist_rc_file(
+        path=rc,
+        neon="1",
+        theme="mintwave",
+        strict="0",
+        remove=False,
+        dry_run=True,
+    )
+    assert result.changed
+
 

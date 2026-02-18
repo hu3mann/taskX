@@ -7,15 +7,9 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 ## [Unreleased]
 
 ### Added
-- 
 
 ### Changed
-- 
 
 ### Fixed
-- 
 
-## [0.0.0] - Initial
-
-### Added
-- Initial project scaffolding.
+### Removed
