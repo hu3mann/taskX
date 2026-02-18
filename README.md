@@ -118,23 +118,27 @@ Expected outputs:
 - `out/taskx_route/ROUTE_PLAN.md`
 - `out/taskx_route/HANDOFF.md` (for handoff flows)
 
-## Docs
+## Documentation Map
 
-- Overview: `docs/00_OVERVIEW.md`
+Canonical spine:
+
+1. `docs/00_OVERVIEW.md`
+2. `docs/10_ARCHITECTURE.md`
+3. `docs/11_PUBLIC_CONTRACT.md`
+4. `docs/12_ROUTER.md`
+5. `docs/14_PROJECT_DOCTOR.md`
+6. `docs/90_RELEASE.md`
+
+Extended references:
+
 - Install: `docs/01_INSTALL.md`
 - Quickstart: `docs/02_QUICKSTART.md`
-- Architecture: `docs/10_ARCHITECTURE.md`
-- Public contract: `docs/11_PUBLIC_CONTRACT.md`
-- Router: `docs/12_ROUTER.md`
 - Task packet format: `docs/13_TASK_PACKET_FORMAT.md`
-- Project doctor: `docs/14_PROJECT_DOCTOR.md`
 - Worktrees and commit sequencing (maintainers): `docs/20_WORKTREES_COMMIT_SEQUENCING.md`
 - Case bundles (maintainers): `docs/21_CASE_BUNDLES.md`
-- Release (maintainers): `docs/90_RELEASE.md`
 
 ## Kernel vs ecosystem
 
 TaskX (kernel) validates packets, plans deterministically, executes one path (or emits a manual handoff), and writes canonical artifacts.
 
 Everything else (scheduling, orchestration, memory, UX) belongs in the ecosystem above the kernel.
-
