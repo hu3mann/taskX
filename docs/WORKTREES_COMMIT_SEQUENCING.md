@@ -4,6 +4,7 @@ Canonical maintainer docs live in:
 
 - `20_WORKTREES_COMMIT_SEQUENCING.md`
 
+
 ## CLI UX (Final Wording)
 
 TaskX prints an identity banner to stderr at command start:
