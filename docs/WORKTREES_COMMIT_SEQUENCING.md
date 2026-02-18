@@ -1,4 +1,8 @@
-# Worktrees + Commit Sequencing
+# Worktrees + Commit Sequencing (Moved)
+
+Canonical maintainer docs live in:
+
+- `20_WORKTREES_COMMIT_SEQUENCING.md`
 
 ## CLI UX (Final Wording)
 
