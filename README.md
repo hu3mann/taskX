@@ -131,6 +131,8 @@ Expected outputs:
 - Worktrees and commit sequencing (maintainers): `docs/20_WORKTREES_COMMIT_SEQUENCING.md`
 - Case bundles (maintainers): `docs/21_CASE_BUNDLES.md`
 - Release (maintainers): `docs/90_RELEASE.md`
+- Security policy: `SECURITY.md`
+- Contributing guide: `CONTRIBUTING.md`
 
 ## Kernel vs ecosystem
 

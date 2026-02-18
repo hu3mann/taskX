@@ -1,0 +1,26 @@
+name: Bug Report
+description: Report a deterministic defect in TaskX
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the observed behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction Steps
+      description: Provide deterministic steps and packet inputs.
+    validations:
+      required: true
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Artifacts
+      description: Paste relevant artifact paths and excerpts.
+    validations:
+      required: true
