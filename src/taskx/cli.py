@@ -465,17 +465,12 @@ def neon_persist(
             remove=remove,
             dry_run=not yes,
         )
-    except ValueError as exc:
-        # Malformed markers in the rc file; present a friendly error instead of a traceback.
+    except OSError as exc:
         if neon_enabled():
-            neon_console.print(
-                f"[bold red]Error:[/bold red] Failed to update rc file {path} due to malformed markers."
-            )
-            neon_console.print(f"[dim]{exc}[/dim]")
+            neon_console.print(f"[bold red]Error:[/bold red] {exc}")
         else:
-            print(f"Error: Failed to update rc file {path} due to malformed markers.")
-            print(exc)
-        raise typer.Exit(1)
+            print(f"Error: {exc}")
+        raise typer.Exit(1) from exc
 
     if neon_enabled():
         neon_console.print(f"[bold]Target:[/bold] {result.path}")

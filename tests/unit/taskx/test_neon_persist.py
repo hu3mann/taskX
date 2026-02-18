@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -149,4 +150,49 @@ def test_cli_rejects_invalid_theme(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0
     assert "Unknown theme:" not in result.output
+
+
+def test_read_permission_error_raises_oserror(tmp_path: Path) -> None:
+    """Test that permission errors during read are properly caught and re-raised as OSError."""
+    rc = tmp_path / "rc"
+    rc.write_text("export FOO=1\n", encoding="utf-8")
+    # Make file unreadable
+    os.chmod(rc, 0o000)
+
+    try:
+        with pytest.raises(OSError, match="Failed to read rc file"):
+            persist_rc_file(
+                path=rc,
+                neon="1",
+                theme="mintwave",
+                strict="0",
+                remove=False,
+                dry_run=True,
+            )
+    finally:
+        # Restore permissions for cleanup
+        os.chmod(rc, 0o644)
+
+
+def test_write_permission_error_raises_oserror(tmp_path: Path) -> None:
+    """Test that permission errors during write are properly caught and re-raised as OSError."""
+    rc = tmp_path / "rc"
+    rc.write_text("export FOO=1\n", encoding="utf-8")
+    # Make directory unwritable to prevent file writes
+    os.chmod(tmp_path, 0o555)
+
+    try:
+        with pytest.raises(OSError, match="Failed to write"):
+            persist_rc_file(
+                path=rc,
+                neon="1",
+                theme="mintwave",
+                strict="0",
+                remove=False,
+                dry_run=False,
+                backup_suffix_fn=lambda: "TEST",
+            )
+    finally:
+        # Restore permissions for cleanup
+        os.chmod(tmp_path, 0o755)
 
