@@ -1,7 +1,7 @@
 import sys
-from typing import Optional
 
-def run_manual_mode(compiled_content: str, platform: str, model: str):
+
+def run_manual_mode(compiled_content: str, platform: str, model: str) -> None:
     print("\n=== TaskX Manual Mode ===")
     print("Please paste current system instructions (optional). End with a single line containing 'END':")
     system_input = []

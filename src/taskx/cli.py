@@ -1,16 +1,19 @@
 """TaskX Ultra-Min CLI - Task Packet Lifecycle Commands Only."""
 
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+import click
 import typer
 from rich.console import Console
+from typer.core import TyperGroup
 
 from taskx import __version__
 from taskx.manifest import (
@@ -53,6 +56,18 @@ from taskx.router import (
     parse_steps as parse_route_steps,
 )
 from taskx.router.types import DEFAULT_PLAN_RELATIVE_PATH
+from taskx.ui import (
+    THEMES,
+    NeonSpinner,
+    console as neon_console,
+    get_theme_name,
+    neon_enabled,
+    render_banner,
+    should_show_banner,
+    sleep_ms,
+    strict_enabled,
+    worship as worship_impl,
+)
 
 # Import pipeline modules (from migrated taskx code)
 try:
@@ -114,28 +129,44 @@ except ImportError:
     ops_app = None  # type: ignore
 
 
+class BannerTyperGroup(TyperGroup):
+    """Custom TyperGroup that displays banner before help text."""
+
+    def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        """Format help with optional banner prepended."""
+        if should_show_banner(sys.argv):
+            from typer.rich_utils import _get_rich_console
+            console_rich = _get_rich_console()
+            render_banner()
+        super().format_help(ctx, formatter)
+
+
 cli = typer.Typer(
     name="taskx",
     help="TaskX - Minimal Task Packet Lifecycle CLI",
     no_args_is_help=True,
+    cls=BannerTyperGroup,
 )
 if ops_app:
     cli.add_typer(ops_app, name="ops")
 console = Console()
+
+neon_app = typer.Typer(help="Neon terminal cosmetics (console-only). Artifacts stay sterile.")
+cli.add_typer(neon_app, name="neon")
 
 
 def _use_compat_options(*_values: object) -> None:
     """Mark backward-compatible CLI options as intentionally accepted."""
 
 
-class DirtyPolicy(str, Enum):
+class DirtyPolicy(StrEnum):
     """Dirty working tree handling policy for deterministic commands."""
 
     REFUSE = "refuse"
     STASH = "stash"
 
 
-class FinishMode(str, Enum):
+class FinishMode(StrEnum):
     """Supported finish strategies."""
 
     REBASE_FF = "rebase-ff"
@@ -144,6 +175,8 @@ class FinishMode(str, Enum):
 def _version_option_callback(value: bool) -> None:
     """Handle eager --version option."""
     if value:
+        if should_show_banner(sys.argv):
+            render_banner()
         typer.echo(__version__)
         raise typer.Exit()
 
@@ -195,6 +228,262 @@ def _check_import_shadowing() -> None:
             f"[yellow]Expected locations: */site-packages/taskx/ or */code/taskX/[/yellow]",
             err=True,
         )
+
+
+@cli.command()
+def worship() -> None:
+    """Console-only easter egg (no artifacts)."""
+    worship_impl()
+
+
+@neon_app.callback(invoke_without_command=True)
+def neon() -> None:
+    """Show current neon theme banner."""
+    render_banner()
+
+
+@neon_app.command("list")
+def neon_list() -> None:
+    """List available neon themes."""
+    for name in sorted(THEMES):
+        if neon_enabled():
+            neon_console.print(f"[bold]  {name}[/bold]")
+        else:
+            print(f"  {name}")
+
+
+@neon_app.command("preview")
+def neon_preview(
+    theme: str = typer.Argument(..., help="Theme name."),
+) -> None:
+    """Preview a theme banner."""
+    if theme not in THEMES:
+        if neon_enabled():
+            neon_console.print(f"[bold red]Unknown theme:[/bold red] {theme}")
+            neon_console.print("Try: taskx neon list")
+        else:
+            print(f"Unknown theme: {theme}")
+            print("Try: taskx neon list")
+        raise typer.Exit(2)
+    render_banner(theme=theme)
+
+
+@neon_app.command("demo")
+def neon_demo(
+    delay_ms: int = typer.Option(220, "--delay-ms", help="Delay between themes (ms)."),
+) -> None:
+    """Cycle through all themes."""
+    for theme in sorted(THEMES):
+        render_banner(theme=theme)
+        sleep_ms(delay_ms)
+
+
+@neon_app.command("set")
+def neon_set(
+    theme: str = typer.Argument(..., help="Theme name."),
+) -> None:
+    """Print a shell export line for TASKX_THEME."""
+    if theme not in THEMES:
+        if neon_enabled():
+            neon_console.print(f"[bold red]Unknown theme:[/bold red] {theme}")
+            neon_console.print("Try: taskx neon list")
+        else:
+            print(f"Unknown theme: {theme}")
+            print("Try: taskx neon list")
+        raise typer.Exit(2)
+    line = f'export TASKX_THEME="{theme}"'
+    if neon_enabled():
+        neon_console.print("[bold bright_green]Copy/paste into your shell:[/bold bright_green]")
+        neon_console.print(line)
+    else:
+        print(line)
+
+
+@neon_app.command("status")
+def neon_status() -> None:
+    """Show neon/strict toggles and selected theme."""
+    enabled = "1" if neon_enabled() else "0"
+    strict = "1" if strict_enabled() else "0"
+    theme = get_theme_name()
+    lines = [
+        f"TASKX_NEON={enabled}",
+        f"TASKX_THEME={theme}",
+        f"TASKX_STRICT={strict}",
+    ]
+    if neon_enabled():
+        neon_console.print("[bold]Neon status[/bold]")
+        for s in lines:
+            neon_console.print(f"  {s}")
+    else:
+        for s in lines:
+            print(s)
+
+
+@neon_app.command("persist")
+def neon_persist(
+    shell: str = typer.Option(
+        "auto",
+        "--shell",
+        help="Target shell rc format: zsh, bash, or auto (infer from $SHELL).",
+    ),
+    path: Path | None = typer.Option(
+        None,
+        "--path",
+        help="Override rc file path (otherwise derived from --shell).",
+    ),
+    remove: bool = typer.Option(
+        False,
+        "--remove",
+        help="Remove the managed TASKX NEON block.",
+    ),
+    dry_run: bool = typer.Option(
+        True,
+        "--dry-run",
+        help="Print a unified diff and do not write.",
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Write changes to disk (creates timestamped backup).",
+    ),
+    theme: str | None = typer.Option(
+        None,
+        "--theme",
+        help="Theme override (default: TASKX_THEME or mintwave).",
+    ),
+    neon: int | None = typer.Option(
+        None,
+        "--neon",
+        help="Override TASKX_NEON (0 or 1).",
+    ),
+    strict: int | None = typer.Option(
+        None,
+        "--strict",
+        help="Override TASKX_STRICT (0 or 1).",
+    ),
+) -> None:
+    """Persist neon env exports into a shell rc file (idempotent markers)."""
+    if yes and dry_run:
+        if neon_enabled():
+            neon_console.print(
+                "[bold red]Refused:[/bold red] --yes and --dry-run are mutually exclusive. "
+                "Use either --yes to write changes or --dry-run to preview them."
+            )
+        else:
+            print(
+                "Refused: --yes and --dry-run are mutually exclusive. "
+                "Use either --yes to write changes or --dry-run to preview them."
+            )
+        raise typer.Exit(2)
+
+    if path is None:
+        resolved_shell = shell
+        if resolved_shell == "auto":
+            shell_env = os.environ.get("SHELL", "")
+            if shell_env.endswith("zsh"):
+                resolved_shell = "zsh"
+            elif shell_env.endswith("bash"):
+                resolved_shell = "bash"
+            else:
+                if neon_enabled():
+                    neon_console.print("[bold red]Refused:[/bold red] unable to infer shell from $SHELL.")
+                    neon_console.print("Provide --shell zsh|bash or --path /path/to/rcfile")
+                else:
+                    print("Refused: unable to infer shell from $SHELL. Provide --shell zsh|bash or --path.")
+                raise typer.Exit(2)
+
+        if resolved_shell == "zsh":
+            path = Path.home() / ".zshrc"
+        elif resolved_shell == "bash":
+            path = Path.home() / ".bashrc"
+        else:
+            if neon_enabled():
+                neon_console.print(
+                    f"[bold red]Refused:[/bold red] unsupported shell '{resolved_shell}'."
+                )
+                neon_console.print("Provide --shell zsh|bash or --path /path/to/rcfile")
+            else:
+                print(
+                    f"Refused: unsupported shell '{resolved_shell}'. "
+                    "Provide --shell zsh|bash or --path /path/to/rcfile."
+                )
+            raise typer.Exit(2)
+
+    desired_neon = str(neon) if neon is not None else os.getenv("TASKX_NEON", "1")
+    desired_strict = str(strict) if strict is not None else os.getenv("TASKX_STRICT", "0")
+    desired_theme = theme or os.getenv("TASKX_THEME", "mintwave")
+
+    # Validate theme against known themes to prevent shell injection
+    if desired_theme not in THEMES:
+        if neon_enabled():
+            neon_console.print(f"[bold red]Unknown theme:[/bold red] {desired_theme}")
+            neon_console.print("Try: taskx neon list")
+        else:
+            print(f"Unknown theme: {desired_theme}")
+            print("Try: taskx neon list")
+        raise typer.Exit(2)
+
+    if desired_neon not in ("0", "1") or desired_strict not in ("0", "1"):
+        if neon_enabled():
+            if desired_neon not in ("0", "1"):
+                neon_console.print(
+                    f"[bold red]Refused:[/bold red] invalid TASKX_NEON value {desired_neon!r}. "
+                    "Expected '0' or '1'."
+                )
+            if desired_strict not in ("0", "1"):
+                neon_console.print(
+                    f"[bold red]Refused:[/bold red] invalid TASKX_STRICT value {desired_strict!r}. "
+                    "Expected '0' or '1'."
+                )
+        else:
+            if desired_neon not in ("0", "1"):
+                print(
+                    f"Refused: invalid TASKX_NEON value {desired_neon!r}. Expected '0' or '1'."
+                )
+            if desired_strict not in ("0", "1"):
+                print(
+                    f"Refused: invalid TASKX_STRICT value {desired_strict!r}. Expected '0' or '1'."
+                )
+        raise typer.Exit(2)
+
+    from taskx.neon_persist import persist_rc_file
+
+    try:
+        result = persist_rc_file(
+            path=path,
+            neon=desired_neon,
+            theme=desired_theme,
+            strict=desired_strict,
+            remove=remove,
+            dry_run=not yes,
+        )
+    except OSError as exc:
+        if neon_enabled():
+            neon_console.print(f"[bold red]Error:[/bold red] {exc}")
+        else:
+            print(f"Error: {exc}")
+        raise typer.Exit(1) from exc
+
+    if neon_enabled():
+        neon_console.print(f"[bold]Target:[/bold] {result.path}")
+        neon_console.print("[dim]Mode: dry-run[/dim]" if not yes else "[dim]Mode: write[/dim]")
+    else:
+        print(f"Target: {result.path}")
+        print("Mode: dry-run" if not yes else "Mode: write")
+
+    if result.diff:
+        print(result.diff, end="" if result.diff.endswith("\n") else "\n")
+    else:
+        if neon_enabled():
+            neon_console.print("[green]No changes.[/green]")
+        else:
+            print("No changes.")
+
+    if result.backup_path is not None:
+        if neon_enabled():
+            neon_console.print(f"[cyan]Backup:[/cyan] {result.backup_path}")
+        else:
+            print(f"Backup: {result.backup_path}")
 
 
 def _check_repo_guard(bypass: bool, rescue_patch: str | None = None) -> Path:
@@ -783,7 +1072,7 @@ def init_cmd(
 
         profile_path = ops_dir / "operator_profile.yaml"
         if not profile_path.exists():
-            import yaml
+            import yaml  # type: ignore[import-untyped]
 
             profile = {
                 "project": {
@@ -1878,10 +2167,12 @@ def route_plan(
 ) -> None:
     """Build deterministic route plan artifacts from packet + availability."""
     try:
-        plan = build_route_plan(
-            repo_root=repo_root,
-            packet_path=packet,
-            steps=parse_route_steps(steps),
+        plan = NeonSpinner("Planning route (no guessing)...").run(
+            lambda: build_route_plan(
+                repo_root=repo_root,
+                packet_path=packet,
+                steps=parse_route_steps(steps),
+            )
         )
     except Exception as exc:
         console.print(f"[bold red]Error:[/bold red] {exc}")
@@ -2759,6 +3050,142 @@ def doctor_cmd(
         raise typer.Exit(code=1) from e
 
 
+@cli.command()
+def upgrade(
+    version: str | None = typer.Option(
+        None,
+        "--version",
+        help="Target version to upgrade/downgrade to",
+    ),
+    latest: bool = typer.Option(
+        False,
+        "--latest",
+        help="Upgrade to the latest version from git remote",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Force re-installation",
+    ),
+) -> None:
+    """Upgrade TaskX in the current repository."""
+    from taskx.utils.repo import detect_repo_root
+
+    console.print("[cyan]TaskX Upgrade[/cyan]")
+
+    try:
+        # Detect repo root
+        try:
+            repo_info = detect_repo_root(Path.cwd())
+            repo_root = repo_info.root
+        except RuntimeError:
+            # Fallback for when we are not in a recognizable repo but might have .taskx-pin
+            # This mimics the bash script behavior
+            repo_root = Path.cwd()
+            console.print("[yellow]Warning: Could not detect repository root. Using current directory.[/yellow]")
+
+        pin_file = repo_root / ".taskx-pin"
+        if not pin_file.exists():
+            console.print(f"[bold red]Error:[/bold red] No .taskx-pin found at {repo_root}")
+            console.print("This command requires an existing installation managed by a pin file.")
+            raise typer.Exit(1)
+
+        # Parse pin file
+        pin_config = {}
+        with open(pin_file, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    pin_config[key.strip()] = value.strip()
+
+        install_method = pin_config.get("install", "git")
+        repo_url = pin_config.get("repo")
+        current_ref = pin_config.get("ref")
+        wheel_path = pin_config.get("path")
+
+        # Determine target ref
+        target_ref = current_ref
+        if version:
+            target_ref = version
+            # Implicitly switch to git if version is specified
+            install_method = "git"
+        elif latest:
+            if install_method != "git" or not repo_url:
+                console.print("[bold red]Error:[/bold red] --latest requires git install method with a valid repo URL")
+                raise typer.Exit(1)
+
+            console.print(f"Fetching latest tag from {repo_url}...")
+            try:
+                cmd = ["git", "ls-remote", "--tags", "--sort=v:refname", repo_url]
+                output = subprocess.check_output(cmd, stderr=subprocess.PIPE, text=True)
+                lines = output.strip().splitlines()
+                if not lines:
+                    console.print("[bold red]Error:[/bold red] No tags found")
+                    raise typer.Exit(1)
+                latest_tag = lines[-1].split("/")[-1]
+                console.print(f"Latest version: {latest_tag}")
+                target_ref = latest_tag
+            except subprocess.CalledProcessError as e:
+                console.print(f"[bold red]Error:[/bold red] Failed to fetch tags: {e}")
+                raise typer.Exit(1) from e
+
+        # Update pin file
+        console.print(f"Updating {pin_file}...")
+        with open(pin_file, "w", encoding="utf-8") as f:
+            if install_method == "git":
+                f.write(f"install=git\nrepo={repo_url or ''}\nref={target_ref}\n")
+            elif install_method == "wheel":
+                f.write(f"install=wheel\npath={wheel_path or ''}\n")
+
+        # Run pip install
+        console.print("Running pip install...")
+        pip_cmd = [sys.executable, "-m", "pip", "install", "--upgrade"]
+        if force:
+            pip_cmd.append("--force-reinstall")
+
+        if install_method == "git":
+            if not repo_url or not target_ref:
+                 console.print("[bold red]Error:[/bold red] Invalid git configuration in pin file")
+                 raise typer.Exit(1)
+            install_url = f"git+{repo_url}@{target_ref}"
+            pip_cmd.append(install_url)
+        elif install_method == "wheel":
+            if not wheel_path:
+                 console.print("[bold red]Error:[/bold red] Invalid wheel configuration in pin file")
+                 raise typer.Exit(1)
+            # Handle relative path
+            full_wheel_path = repo_root / wheel_path
+            if not full_wheel_path.exists():
+                 console.print(f"[bold red]Error:[/bold red] Wheel not found at {full_wheel_path}")
+                 raise typer.Exit(1)
+            pip_cmd.append(str(full_wheel_path))
+
+        try:
+            subprocess.check_call(pip_cmd)
+            console.print("[green]✓ Upgrade successful[/green]")
+        except subprocess.CalledProcessError as e:
+             console.print(f"[bold red]Error:[/bold red] Installation failed: {e}")
+             raise typer.Exit(1) from e
+
+        # Verify
+        try:
+            # We can't easily reload the module in-process to check version,
+            # but we can spawn a check.
+            verify_cmd = [sys.executable, "-c", "import taskx; print(f'TaskX Version: {taskx.__version__}')"]
+            subprocess.check_call(verify_cmd)
+        except subprocess.CalledProcessError:
+             console.print("[yellow]Warning: Post-install verification failed[/yellow]")
+
+    except typer.Exit:
+        raise
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] Upgrade failed: {e}")
+        raise typer.Exit(1) from e
+
+
 @cli.command(name="ci-gate")
 def ci_gate_cmd(
     out: Path | None = typer.Option(
@@ -2945,7 +3372,7 @@ def ci_gate_cmd(
 
 
 
-class ProjectPreset(str, Enum):
+class ProjectPreset(StrEnum):
     """Supported directive presets for project init."""
 
     TASKX = "taskx"
@@ -2954,14 +3381,14 @@ class ProjectPreset(str, Enum):
     NONE = "none"
 
 
-class ProjectPack(str, Enum):
+class ProjectPack(StrEnum):
     """Supported directive packs for project toggles."""
 
     TASKX = "taskx"
     CHATX = "chatx"
 
 
-class ProjectMode(str, Enum):
+class ProjectMode(StrEnum):
     """Supported master modes."""
 
     TASKX = "taskx"

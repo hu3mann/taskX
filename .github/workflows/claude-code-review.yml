@@ -18,6 +18,9 @@ jobs:
     #   github.event.pull_request.user.login == 'new-developer' ||
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
     
+    # Skip if no API key is present or if PR is from a Bot
+    if: ${{ github.event.pull_request.user.type != 'Bot' && secrets.ANTHROPIC_API_KEY != '' }}
+    
     runs-on: ubuntu-latest
     permissions:
       contents: read

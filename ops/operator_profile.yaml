@@ -3,7 +3,7 @@ platform:
   target: chatgpt
 project:
   name: taskX
-  repo_root: /Users/hue/code/taskX
+  repo_root: .
   timezone: America/Vancouver
 taskx:
   cli_min_version: 0.1.2

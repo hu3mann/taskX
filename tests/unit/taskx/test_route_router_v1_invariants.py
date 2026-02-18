@@ -102,7 +102,7 @@ def test_route_plan_refusal_writes_artifacts_and_is_deterministic(repo: Path) ->
     assert plan1["policy"]["escalation_ladder"] == DEFAULT_LADDER
     assert len(plan1["refusal_reasons"]) == len(REFUSAL_STEPS)
     for index, step in enumerate(REFUSAL_STEPS):
-        assert f"Step `{step}` below score threshold" in plan1["refusal_reasons"][index]
+        assert f"Step `{step}` below score threshold" in plan1["refusal_reasons"][index]["message"]
         assert plan1["steps"][index]["step"] == step
         candidates = plan1["steps"][index]["candidates_top3"]
         assert isinstance(candidates, list)
@@ -153,7 +153,7 @@ def test_route_plan_missing_availability_refuses_and_writes_plan(repo: Path) -> 
     _ensure_plan_artifacts(repo)
     plan = _load_plan(repo)
     assert plan["status"] == "refused"
-    assert any("availability" in reason and "missing" in reason for reason in plan["refusal_reasons"])
+    assert any("availability" in reason["message"] and "missing" in reason["message"] for reason in plan["refusal_reasons"])
 
 
 def test_route_plan_invalid_availability_refuses_and_writes_plan(repo: Path) -> None:
@@ -166,7 +166,7 @@ def test_route_plan_invalid_availability_refuses_and_writes_plan(repo: Path) -> 
     _ensure_plan_artifacts(repo)
     plan = _load_plan(repo)
     assert plan["status"] == "refused"
-    assert any("YAML" in reason or "parse" in reason for reason in plan["refusal_reasons"])
+    assert any("YAML" in reason["message"] or "parse" in reason["message"] for reason in plan["refusal_reasons"])
 
 
 def test_route_plan_availability_missing_required_keys_refuses_and_writes_plan(repo: Path) -> None:
@@ -179,7 +179,7 @@ def test_route_plan_availability_missing_required_keys_refuses_and_writes_plan(r
     _ensure_plan_artifacts(repo)
     plan = _load_plan(repo)
     assert plan["status"] == "refused"
-    assert any("missing" in reason and "model" in reason.lower() for reason in plan["refusal_reasons"])
+    assert any("missing" in reason["message"] and "model" in reason["message"].lower() for reason in plan["refusal_reasons"])
 
 
 def test_route_handoff_and_explain_are_deterministic(repo: Path) -> None:

@@ -60,6 +60,10 @@ AVAILABILITY_CONFIG_TEMPLATE: dict[str, Any] = {
             "available": True,
             "strengths": ["quick_commands", "cheap_flows", "automation"],
         },
+        "google_jules": {
+            "available": True,
+            "strengths": ["context_awareness", "file_system", "reasoning"],
+        },
     },
     "policy": {
         "require_explain": True,

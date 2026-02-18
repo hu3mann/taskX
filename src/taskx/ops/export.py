@@ -1,7 +1,8 @@
 import hashlib
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]
+
 
 def load_profile(profile_path: Path) -> dict:
     if not profile_path.exists():

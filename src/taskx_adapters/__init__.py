@@ -9,7 +9,6 @@ third-party packages can register adapters automatically.
 
 from __future__ import annotations
 
-import sys
 from typing import TYPE_CHECKING
 
 from taskx_adapters.base import AdapterInfo, BaseAdapter
@@ -41,17 +40,12 @@ __all__ = [
 def discover_adapters() -> Iterator[BaseAdapter]:
     """Yield all adapters registered under the ``taskx.adapters`` entry-point group.
 
-    Uses ``importlib.metadata.entry_points`` (Python 3.12+) or the
-    ``group`` keyword (Python 3.9-3.11).
+    Uses ``importlib.metadata.entry_points(group=...)`` (Python 3.10+).
+    Since this project requires Python >=3.11, the ``group`` parameter is always available.
     """
-    if sys.version_info >= (3, 12):
-        from importlib.metadata import entry_points
+    from importlib.metadata import entry_points
 
-        eps = entry_points(group="taskx.adapters")
-    else:
-        from importlib.metadata import entry_points
-
-        eps = entry_points().get("taskx.adapters", [])
+    eps = entry_points(group="taskx.adapters")
 
     for ep in eps:
         adapter_cls = ep.load()

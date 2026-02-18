@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Dict, List, NamedTuple
+from typing import List, NamedTuple
 
 class Conflict(NamedTuple):
     path: Path

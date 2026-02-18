@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 DEFAULT_STEPS: tuple[str, ...] = (
     "compile-tasks",
@@ -22,7 +21,7 @@ DEFAULT_HANDOFF_RELATIVE_PATH = Path("out/taskx_route/HANDOFF.md")
 
 COST_TIERS: tuple[str, ...] = ("cheap", "medium", "high")
 CONTEXT_WINDOWS: tuple[str, ...] = ("small", "medium", "large")
-RUNNER_NAMES: tuple[str, ...] = ("claude_code", "codex_desktop", "copilot_cli")
+RUNNER_NAMES: tuple[str, ...] = ("claude_code", "codex_desktop", "copilot_cli", "google_jules")
 
 
 @dataclass(frozen=True)

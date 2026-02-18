@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from taskx.artifacts.canonical_json import sha256_file, write_json
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 ARTIFACT_INDEX_SCHEMA_VERSION = "taskx.orchestrator.v0"
 

@@ -2,11 +2,9 @@
 # Project: taskX
 # Platform: chatgpt
 # Model: gpt-5.2-thinking
-# Repo Root: /Users/hue/code/taskX
 # Timezone: America/Vancouver
+# TaskX Version: unknown
 # TaskX Pin: git_commit=50548e9c079fb86245d8580f25cf7d11485be528
-# CLI Min Version: 0.1.2
-
 # BASE SUPERVISOR (Canonical Minimal Baseline v1)
 
 ## Role

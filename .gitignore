@@ -6,6 +6,10 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Virtual environment
+.venv/
+venv/
+
 # Coverage
 .coverage
 htmlcov/
@@ -17,3 +21,4 @@ build/
 
 # Local outputs
 out/
+.mypy_cache/
