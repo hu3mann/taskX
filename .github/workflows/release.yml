@@ -42,6 +42,7 @@ jobs:
             exit 1
           fi
 
+          echo "TAG_VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
           echo "Tag/version consistency OK: $TAG_VERSION"
 
       - name: Install dependencies
@@ -56,7 +57,11 @@ jobs:
           source .venv-wheel-smoke/bin/activate
           python -m pip install --upgrade pip
           pip install dist/*.whl
-          taskx --version
+          INSTALLED_VERSION="$(taskx --version | tail -n 1 | tr -d '\r')"
+          if [ "$INSTALLED_VERSION" != "$TAG_VERSION" ]; then
+            echo "Installed CLI version mismatch: installed=$INSTALLED_VERSION expected=$TAG_VERSION"
+            exit 1
+          fi
 
       - name: Generate release hashes
         run: sha256sum dist/* > dist/SHA256SUMS.txt
