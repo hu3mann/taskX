@@ -9,8 +9,10 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+import click
 import typer
 from rich.console import Console
+from typer.core import TyperGroup
 
 from taskx import __version__
 from taskx.manifest import (
@@ -53,6 +55,18 @@ from taskx.router import (
     parse_steps as parse_route_steps,
 )
 from taskx.router.types import DEFAULT_PLAN_RELATIVE_PATH
+from taskx.ui import (
+    THEMES,
+    NeonSpinner,
+    console as neon_console,
+    get_theme_name,
+    neon_enabled,
+    render_banner,
+    should_show_banner,
+    sleep_ms,
+    strict_enabled,
+    worship as worship_impl,
+)
 
 # Import pipeline modules (from migrated taskx code)
 try:
@@ -114,14 +128,30 @@ except ImportError:
     ops_app = None  # type: ignore
 
 
+class BannerTyperGroup(TyperGroup):
+    """Custom TyperGroup that displays banner before help text."""
+
+    def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        """Format help with optional banner prepended."""
+        if should_show_banner(sys.argv):
+            from typer.rich_utils import _get_rich_console
+            console_rich = _get_rich_console()
+            render_banner()
+        super().format_help(ctx, formatter)
+
+
 cli = typer.Typer(
     name="taskx",
     help="TaskX - Minimal Task Packet Lifecycle CLI",
     no_args_is_help=True,
+    cls=BannerTyperGroup,
 )
 if ops_app:
     cli.add_typer(ops_app, name="ops")
 console = Console()
+
+neon_app = typer.Typer(help="Neon terminal cosmetics (console-only). Artifacts stay sterile.")
+cli.add_typer(neon_app, name="neon")
 
 
 def _use_compat_options(*_values: object) -> None:
@@ -144,6 +174,8 @@ class FinishMode(StrEnum):
 def _version_option_callback(value: bool) -> None:
     """Handle eager --version option."""
     if value:
+        if should_show_banner(sys.argv):
+            render_banner()
         typer.echo(__version__)
         raise typer.Exit()
 
@@ -195,6 +227,95 @@ def _check_import_shadowing() -> None:
             f"[yellow]Expected locations: */site-packages/taskx/ or */code/taskX/[/yellow]",
             err=True,
         )
+
+
+@cli.command()
+def worship() -> None:
+    """Console-only easter egg (no artifacts)."""
+    worship_impl()
+
+
+@neon_app.callback(invoke_without_command=True)
+def neon() -> None:
+    """Show current neon theme banner."""
+    render_banner()
+
+
+@neon_app.command("list")
+def neon_list() -> None:
+    """List available neon themes."""
+    for name in sorted(THEMES):
+        if neon_enabled():
+            neon_console.print(f"[bold]  {name}[/bold]")
+        else:
+            print(f"  {name}")
+
+
+@neon_app.command("preview")
+def neon_preview(
+    theme: str = typer.Argument(..., help="Theme name."),
+) -> None:
+    """Preview a theme banner."""
+    if theme not in THEMES:
+        if neon_enabled():
+            neon_console.print(f"[bold red]Unknown theme:[/bold red] {theme}")
+            neon_console.print("Try: taskx neon list")
+        else:
+            print(f"Unknown theme: {theme}")
+            print("Try: taskx neon list")
+        raise typer.Exit(2)
+    render_banner(theme=theme)
+
+
+@neon_app.command("demo")
+def neon_demo(
+    delay_ms: int = typer.Option(220, "--delay-ms", help="Delay between themes (ms)."),
+) -> None:
+    """Cycle through all themes."""
+    for theme in sorted(THEMES):
+        render_banner(theme=theme)
+        sleep_ms(delay_ms)
+
+
+@neon_app.command("set")
+def neon_set(
+    theme: str = typer.Argument(..., help="Theme name."),
+) -> None:
+    """Print a shell export line for TASKX_THEME."""
+    if theme not in THEMES:
+        if neon_enabled():
+            neon_console.print(f"[bold red]Unknown theme:[/bold red] {theme}")
+            neon_console.print("Try: taskx neon list")
+        else:
+            print(f"Unknown theme: {theme}")
+            print("Try: taskx neon list")
+        raise typer.Exit(2)
+    line = f'export TASKX_THEME="{theme}"'
+    if neon_enabled():
+        neon_console.print("[bold bright_green]Copy/paste into your shell:[/bold bright_green]")
+        neon_console.print(line)
+    else:
+        print(line)
+
+
+@neon_app.command("status")
+def neon_status() -> None:
+    """Show neon/strict toggles and selected theme."""
+    enabled = "1" if neon_enabled() else "0"
+    strict = "1" if strict_enabled() else "0"
+    theme = get_theme_name()
+    lines = [
+        f"TASKX_NEON={enabled}",
+        f"TASKX_THEME={theme}",
+        f"TASKX_STRICT={strict}",
+    ]
+    if neon_enabled():
+        neon_console.print("[bold]Neon status[/bold]")
+        for s in lines:
+            neon_console.print(f"  {s}")
+    else:
+        for s in lines:
+            print(s)
 
 
 def _check_repo_guard(bypass: bool, rescue_patch: str | None = None) -> Path:
@@ -1878,10 +1999,12 @@ def route_plan(
 ) -> None:
     """Build deterministic route plan artifacts from packet + availability."""
     try:
-        plan = build_route_plan(
-            repo_root=repo_root,
-            packet_path=packet,
-            steps=parse_route_steps(steps),
+        plan = NeonSpinner("Planning route (no guessing)...").run(
+            lambda: build_route_plan(
+                repo_root=repo_root,
+                packet_path=packet,
+                steps=parse_route_steps(steps),
+            )
         )
     except Exception as exc:
         console.print(f"[bold red]Error:[/bold red] {exc}")
