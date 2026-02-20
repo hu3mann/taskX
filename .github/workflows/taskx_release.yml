@@ -2,6 +2,11 @@ name: TaskX Release (Legacy Manual)
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.2.3 — without the v prefix)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -20,12 +25,16 @@ jobs:
         with:
           python-version: "3.11"
       
-      - name: Extract version from tag
+      - name: Validate version input
         id: get_version
         run: |
-          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          TAG_VERSION="${{ inputs.version }}"
+          if ! [[ "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Error: version input must be semver (X.Y.Z): $TAG_VERSION"
+            exit 1
+          fi
           echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
-          echo "Tag version: $TAG_VERSION"
+          echo "Version: $TAG_VERSION"
       
       - name: Validate version consistency
         run: |
@@ -85,6 +94,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: "v${{ steps.get_version.outputs.tag_version }}"
           name: "TaskX v${{ steps.get_version.outputs.tag_version }}"
           body: |
             ## TaskX v${{ steps.get_version.outputs.tag_version }}
@@ -93,7 +103,7 @@ jobs:
             
             **From Git Tag:**
             ```bash
-            pip install "taskx @ git+ssh://git@github.com/${{ github.repository }}.git@${{ github.ref_name }}"
+            pip install "taskx @ git+ssh://git@github.com/${{ github.repository }}.git@v${{ steps.get_version.outputs.tag_version }}"
             ```
             
             **From Wheel (download asset below):**
