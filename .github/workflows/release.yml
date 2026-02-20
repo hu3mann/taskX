@@ -63,7 +63,11 @@ jobs:
           source .venv-wheel-smoke/bin/activate
           python -m pip install --upgrade pip
           pip install dist/*.whl
-          INSTALLED_VERSION="$(taskx --version | tail -n 1 | tr -d '\r')"
+          INSTALLED_VERSION="$(python - << 'PY'
+          from importlib.metadata import version
+          print(version("taskx"))
+          PY
+          )"
           if [ "$INSTALLED_VERSION" != "$TAG_VERSION" ]; then
             echo "Installed CLI version mismatch: installed=$INSTALLED_VERSION expected=$TAG_VERSION"
             exit 1
