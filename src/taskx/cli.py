@@ -141,6 +141,11 @@ try:
 except ImportError:
     ops_app = None  # type: ignore
 
+try:
+    from taskx.ops.tp_git.cli import app as tp_git_app
+except ImportError:
+    tp_git_app = None  # type: ignore
+
 
 class BannerTyperGroup(TyperGroup):
     """Custom TyperGroup that displays banner before help text."""
@@ -170,6 +175,10 @@ neon_app = typer.Typer(help="Neon terminal cosmetics (console-only). Artifacts s
 cli.add_typer(neon_app, name="neon")
 metrics_app = typer.Typer(help="Local-only opt-in usage metrics (no telemetry).")
 cli.add_typer(metrics_app, name="metrics")
+tp_app = typer.Typer(name="tp", help="Task Packet workflow commands", no_args_is_help=True)
+cli.add_typer(tp_app, name="tp")
+if tp_git_app:
+    tp_app.add_typer(tp_git_app, name="git")
 
 
 def _use_compat_options(*_values: object) -> None:

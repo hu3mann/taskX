@@ -21,4 +21,5 @@ build/
 
 # Local outputs
 out/
+.worktrees/
 .mypy_cache/
