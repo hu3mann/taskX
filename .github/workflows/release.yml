@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  pypi-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Enforce tag and version consistency
+        run: |
+          TAG="$(git describe --tags --exact-match)"
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag must be semver (vX.Y.Z): $TAG"
+            exit 1
+          fi
+
+          PYPROJECT_VERSION="$(grep '^version = ' pyproject.toml | head -n 1 | sed -E 's/version = \"([^\"]+)\"/\\1/')"
+          TAG_VERSION="${TAG#v}"
+          if [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "Tag/version mismatch: tag=$TAG_VERSION pyproject=$PYPROJECT_VERSION"
+            exit 1
+          fi
+
+          echo "TAG_VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+          echo "Tag/version consistency OK: $TAG_VERSION"
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Build artifacts
+        run: uv build
+
+      - name: Verify wheel installation
+        run: |
+          python -m venv .venv-wheel-smoke
+          source .venv-wheel-smoke/bin/activate
+          python -m pip install --upgrade pip
+          pip install dist/*.whl
+          INSTALLED_VERSION="$(taskx --version | tail -n 1 | tr -d '\r')"
+          if [ "$INSTALLED_VERSION" != "$TAG_VERSION" ]; then
+            echo "Installed CLI version mismatch: installed=$INSTALLED_VERSION expected=$TAG_VERSION"
+            exit 1
+          fi
+
+      - name: Generate release hashes
+        run: sha256sum dist/* > dist/SHA256SUMS.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: taskx-release-dist-${{ github.ref_name }}
+          path: dist/
+          retention-days: 14
+
+      - name: Publish to PyPI
+        env:
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -n "${PYPI_API_TOKEN:-}" ]; then
+            uv publish --token "$PYPI_API_TOKEN"
+          else
+            uv publish
+          fi

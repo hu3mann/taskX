@@ -1,9 +1,7 @@
-name: TaskX Release
+name: TaskX Release (Legacy Manual)
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
