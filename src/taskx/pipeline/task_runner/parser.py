@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from typing import TYPE_CHECKING
 
+<<<<<<< Updated upstream
 from taskx.pipeline.task_runner.types import (
     ProjectIdentity,
     TaskPacketInfo,
 )
+=======
+from taskx.pipeline.task_runner.types import CommitStep, TaskPacketInfo
+>>>>>>> Stashed changes
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -92,6 +97,10 @@ def parse_task_packet(
 
     # Extract sources
     sources = _extract_sources(sections["SOURCES"])
+    commit_plan = _extract_commit_plan(
+        sections.get("COMMIT PLAN"),
+        packet_path=packet_path,
+    )
 
     return TaskPacketInfo(
         id=packet_id,
@@ -101,6 +110,7 @@ def parse_task_packet(
         allowlist=allowlist,
         sources=sources,
         verification_commands=verification,
+        commit_plan=commit_plan,
         sections=sections,
         project_identity=project_identity,
     )
@@ -239,6 +249,7 @@ def _extract_sources(section_content: str) -> list[str]:
     return sources
 
 
+<<<<<<< Updated upstream
 def _extract_project_identity(section_content: str | None) -> ProjectIdentity | None:
     """Parse optional PROJECT IDENTITY section key/value pairs."""
     if section_content is None:
@@ -284,3 +295,100 @@ def _assert_project_identity_header(
             "ERROR: Task Packet missing required PROJECT IDENTITY header.\n"
             "Refusing to run."
         )
+=======
+def _extract_commit_plan(
+    section_content: str | None,
+    *,
+    packet_path: Path,
+) -> list[CommitStep] | None:
+    """Extract optional commit plan from fenced JSON block."""
+    if section_content is None:
+        return None
+
+    code_block_match = re.search(
+        r"```(?:json)?\n(.*?)\n```",
+        section_content,
+        re.DOTALL,
+    )
+    if not code_block_match:
+        raise ValueError(
+            f"Task packet {packet_path} has COMMIT PLAN section without fenced JSON block"
+        )
+
+    raw_json = code_block_match.group(1).strip()
+    try:
+        payload = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Task packet {packet_path} has invalid COMMIT PLAN JSON: {exc}"
+        ) from exc
+
+    if not isinstance(payload, dict):
+        raise ValueError(f"Task packet {packet_path} COMMIT PLAN must be a JSON object")
+
+    raw_plan = payload.get("commit_plan")
+    if not isinstance(raw_plan, list):
+        raise ValueError(
+            f"Task packet {packet_path} COMMIT PLAN must define a non-empty 'commit_plan' list"
+        )
+
+    steps: list[CommitStep] = []
+    for idx, raw_step in enumerate(raw_plan, start=1):
+        if not isinstance(raw_step, dict):
+            raise ValueError(
+                f"Task packet {packet_path} COMMIT PLAN step {idx} must be an object"
+            )
+
+        step_id = raw_step.get("step_id")
+        message = raw_step.get("message")
+        allowlist = raw_step.get("allowlist")
+        verify = raw_step.get("verify")
+
+        if not isinstance(step_id, str) or not step_id.strip():
+            raise ValueError(
+                f"Task packet {packet_path} COMMIT PLAN step {idx} has empty step_id"
+            )
+        if not isinstance(message, str) or not message.strip():
+            raise ValueError(
+                f"Task packet {packet_path} COMMIT PLAN step {idx} has empty message"
+            )
+        if not isinstance(allowlist, list) or not allowlist:
+            raise ValueError(
+                f"Task packet {packet_path} COMMIT PLAN step {idx} has empty allowlist"
+            )
+
+        clean_allowlist: list[str] = []
+        for allow_idx, item in enumerate(allowlist, start=1):
+            if not isinstance(item, str) or not item.strip():
+                raise ValueError(
+                    f"Task packet {packet_path} COMMIT PLAN step {idx} "
+                    f"allowlist item {allow_idx} must be a non-empty string"
+                )
+            clean_allowlist.append(item.strip())
+
+        verify_commands: list[str] | None = None
+        if verify is not None:
+            if not isinstance(verify, list):
+                raise ValueError(
+                    f"Task packet {packet_path} COMMIT PLAN step {idx} verify must be a list"
+                )
+            verify_commands = []
+            for verify_idx, command in enumerate(verify, start=1):
+                if not isinstance(command, str) or not command.strip():
+                    raise ValueError(
+                        f"Task packet {packet_path} COMMIT PLAN step {idx} "
+                        f"verify command {verify_idx} must be a non-empty string"
+                    )
+                verify_commands.append(command.strip())
+
+        steps.append(
+            CommitStep(
+                step_id=step_id.strip(),
+                message=message.strip(),
+                allowlist=clean_allowlist,
+                verify=verify_commands,
+            )
+        )
+
+    return steps
+>>>>>>> Stashed changes

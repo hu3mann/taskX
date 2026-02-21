@@ -29,10 +29,14 @@ from taskx.manifest import (
     get_timestamp as get_manifest_timestamp,
 )
 from taskx.obs.run_artifacts import (
+    COMMIT_SEQUENCE_RUN_FILENAME,
     COMMIT_RUN_FILENAME,
+    DIRTY_STATE_FILENAME,
+    FINISH_FILENAME,
     PROMOTION_LEGACY_FILENAME,
     PROMOTION_TOKEN_FILENAME,
     VIOLATIONS_FILENAME,
+    WORKTREE_FILENAME,
     get_default_run_root,
     make_run_id,
     normalize_timestamp_mode,
@@ -781,6 +785,13 @@ manifest_app = typer.Typer(
 )
 cli.add_typer(manifest_app, name="manifest")
 
+wt_app = typer.Typer(
+    name="wt",
+    help="Worktree lifecycle commands for commit sequencing",
+    no_args_is_help=True,
+)
+cli.add_typer(wt_app, name="wt")
+
 
 @manifest_app.command(name="init")
 def manifest_init_cmd(
@@ -921,6 +932,146 @@ def manifest_check_cmd(
         raise typer.Exit(2)
 
     console.print("[green]✓ Manifest replay check passed[/green]")
+
+
+@wt_app.command(name="start")
+def wt_start(
+    run: Path | None = typer.Option(
+        None,
+        "--run",
+        help="Path to run directory (default <run-root>/<run-id>)",
+    ),
+    run_root: Path | None = typer.Option(
+        None,
+        "--run-root",
+        help="Run root used when --run is omitted",
+    ),
+    repo_root: Path | None = typer.Option(
+        None,
+        help="Repository root directory",
+    ),
+    branch: str | None = typer.Option(
+        None,
+        "--branch",
+        help="Task branch name (default taskx/<run-id>)",
+    ),
+    worktree_path: Path | None = typer.Option(
+        None,
+        "--worktree-path",
+        help="Explicit worktree target path",
+    ),
+    base_branch: str = typer.Option(
+        "main",
+        "--base-branch",
+        help="Base branch to branch from",
+    ),
+    remote: str = typer.Option(
+        "origin",
+        "--remote",
+        help="Remote name to fetch and branch from",
+    ),
+    dirty_policy: str = typer.Option(
+        "refuse",
+        "--dirty-policy",
+        help="Dirty handling: refuse (default) or stash",
+    ),
+    timestamp_mode: str = typer.Option(
+        "deterministic",
+        "--timestamp-mode",
+        help="Timestamp mode: deterministic, now, or wallclock",
+    ),
+    no_repo_guard: bool = typer.Option(
+        False,
+        "--no-repo-guard",
+        help="Skip TaskX repo detection (use with caution)",
+    ),
+    manifest: bool = typer.Option(
+        False,
+        "--manifest",
+        help="Initialize manifest if missing and append this command record",
+    ),
+    rescue_patch: str | None = typer.Option(
+        None,
+        "--rescue-patch",
+        help="Write a rescue patch on guard failure (path or 'auto')",
+    ),
+) -> None:
+    """Start a task worktree/branch for commit sequencing."""
+    from taskx.git.worktree import start_worktree as start_worktree_impl
+
+    selected_run: Path | None = None
+    manifest_enabled = False
+    manifest_started_at = get_manifest_timestamp("deterministic")
+    manifest_stdout: list[str] = []
+    manifest_stderr: list[str] = []
+    manifest_exit_code = 1
+
+    try:
+        manifest_started_at = get_manifest_timestamp(normalize_timestamp_mode(timestamp_mode))
+        guarded_repo_root = _check_repo_guard(no_repo_guard, rescue_patch=rescue_patch)
+        selected_run = _resolve_stateful_run_dir(run, run_root, timestamp_mode).resolve()
+        selected_run.mkdir(parents=True, exist_ok=True)
+        manifest_enabled = _ensure_manifest_ready(
+            selected_run,
+            create_if_missing=manifest,
+            mode="ACT",
+            timestamp_mode=timestamp_mode,
+        )
+        effective_repo_root = (repo_root or guarded_repo_root).resolve()
+
+        console.print("[cyan]Starting worktree...[/cyan]")
+        console.print(f"[cyan]Run directory:[/cyan] {selected_run}")
+
+        report = start_worktree_impl(
+            run_dir=selected_run,
+            repo_root=effective_repo_root,
+            base_branch=base_branch,
+            remote=remote,
+            branch=branch,
+            worktree_path=worktree_path,
+            dirty_policy=dirty_policy,
+        )
+
+        if report["status"] == "passed":
+            artifact_path = selected_run / WORKTREE_FILENAME
+            console.print("[green]✓ Worktree started successfully[/green]")
+            console.print(f"[green]  Branch: {report['worktree']['branch']}[/green]")
+            console.print(f"[green]  Worktree: {report['worktree']['worktree_path']}[/green]")
+            console.print(f"[green]  Artifact: {artifact_path}[/green]")
+            manifest_stdout.extend(
+                [
+                    "Worktree started successfully",
+                    f"Branch: {report['worktree']['branch']}",
+                    f"Worktree: {report['worktree']['worktree_path']}",
+                ]
+            )
+            raise typer.Exit(0)
+
+        console.print("[red]✗ Worktree start failed[/red]")
+        manifest_stdout.append("Worktree start failed")
+        for error in report.get("errors", []):
+            console.print(f"[red]  • {error}[/red]")
+            manifest_stderr.append(str(error))
+        raise typer.Exit(2)
+
+    except typer.Exit as exc:
+        manifest_exit_code = int(exc.exit_code)
+        raise
+    except Exception as e:
+        manifest_stderr.append(str(e))
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(1)
+    finally:
+        _append_manifest_command(
+            enabled=manifest_enabled,
+            run_dir=selected_run,
+            timestamp_mode=timestamp_mode,
+            exit_code=manifest_exit_code,
+            started_at=manifest_started_at,
+            stdout_lines=manifest_stdout,
+            stderr_lines=manifest_stderr,
+            expected_artifacts=[WORKTREE_FILENAME, DIRTY_STATE_FILENAME],
+        )
 
 
 @cli.command(name="print-runtime-origin", hidden=True)
@@ -1631,6 +1782,248 @@ def commit_run(
             stdout_lines=manifest_stdout,
             stderr_lines=manifest_stderr,
             expected_artifacts=[COMMIT_RUN_FILENAME],
+        )
+
+
+@cli.command(name="commit-sequence")
+def commit_sequence_cmd(
+    run: Path | None = typer.Option(
+        None,
+        "--run",
+        help="Path to run directory (default <run-root>/<run-id>)",
+    ),
+    run_root: Path | None = typer.Option(
+        None,
+        "--run-root",
+        help="Run root used when --run is omitted",
+    ),
+    allow_unpromoted: bool = typer.Option(
+        False,
+        "--allow-unpromoted",
+        help="Allow commit sequence without promotion token",
+    ),
+    dirty_policy: str = typer.Option(
+        "refuse",
+        "--dirty-policy",
+        help="Dirty handling: refuse (default) or stash",
+    ),
+    timestamp_mode: str = typer.Option(
+        "deterministic",
+        "--timestamp-mode",
+        help="Timestamp mode: deterministic, now, or wallclock",
+    ),
+    no_repo_guard: bool = typer.Option(
+        False,
+        "--no-repo-guard",
+        help="Skip TaskX repo detection (use with caution)",
+    ),
+    manifest: bool = typer.Option(
+        False,
+        "--manifest",
+        help="Initialize manifest if missing and append this command record",
+    ),
+    rescue_patch: str | None = typer.Option(
+        None,
+        "--rescue-patch",
+        help="Write a rescue patch on guard failure (path or 'auto')",
+    ),
+) -> None:
+    """Create one commit per COMMIT PLAN step inside the run worktree."""
+    from taskx.git.commit_sequence import commit_sequence as commit_sequence_impl
+
+    selected_run: Path | None = None
+    manifest_enabled = False
+    manifest_started_at = get_manifest_timestamp("deterministic")
+    manifest_stdout: list[str] = []
+    manifest_stderr: list[str] = []
+    manifest_exit_code = 1
+
+    try:
+        manifest_started_at = get_manifest_timestamp(normalize_timestamp_mode(timestamp_mode))
+        _check_repo_guard(no_repo_guard, rescue_patch=rescue_patch)
+        selected_run = _resolve_stateful_run_dir(run, run_root, timestamp_mode).resolve()
+        manifest_enabled = _ensure_manifest_ready(
+            selected_run,
+            create_if_missing=manifest,
+            mode="ACT",
+            timestamp_mode=timestamp_mode,
+        )
+        pipeline_timestamp_mode = to_pipeline_timestamp_mode(timestamp_mode)
+        console.print("[cyan]Running commit sequence...[/cyan]")
+        console.print(f"[cyan]Run directory:[/cyan] {selected_run}")
+
+        report = commit_sequence_impl(
+            run_dir=selected_run,
+            allow_unpromoted=allow_unpromoted,
+            timestamp_mode=pipeline_timestamp_mode,
+            dirty_policy=dirty_policy,
+        )
+
+        if report["status"] == "passed":
+            console.print("[green]✓ Commit sequence completed[/green]")
+            console.print(f"[green]  Branch: {report['git']['branch']}[/green]")
+            console.print(f"[green]  Steps committed: {len(report['steps'])}[/green]")
+            console.print(f"[green]  Report: {selected_run / COMMIT_SEQUENCE_RUN_FILENAME}[/green]")
+            manifest_stdout.extend(
+                [
+                    "Commit sequence completed",
+                    f"Branch: {report['git']['branch']}",
+                    f"Steps committed: {len(report['steps'])}",
+                ]
+            )
+            raise typer.Exit(0)
+
+        console.print("[red]✗ Commit sequence failed[/red]")
+        manifest_stdout.append("Commit sequence failed")
+        for error in report.get("errors", []):
+            console.print(f"[red]  • {error}[/red]")
+            manifest_stderr.append(str(error))
+        raise typer.Exit(2)
+
+    except typer.Exit as exc:
+        manifest_exit_code = int(exc.exit_code)
+        raise
+    except Exception as e:
+        manifest_stderr.append(str(e))
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(1)
+    finally:
+        _append_manifest_command(
+            enabled=manifest_enabled,
+            run_dir=selected_run,
+            timestamp_mode=timestamp_mode,
+            exit_code=manifest_exit_code,
+            started_at=manifest_started_at,
+            stdout_lines=manifest_stdout,
+            stderr_lines=manifest_stderr,
+            expected_artifacts=[COMMIT_SEQUENCE_RUN_FILENAME, DIRTY_STATE_FILENAME],
+        )
+
+
+@cli.command(name="finish")
+def finish_cmd(
+    run: Path | None = typer.Option(
+        None,
+        "--run",
+        help="Path to run directory (default <run-root>/<run-id>)",
+    ),
+    run_root: Path | None = typer.Option(
+        None,
+        "--run-root",
+        help="Run root used when --run is omitted",
+    ),
+    mode: str = typer.Option(
+        "rebase-ff",
+        "--mode",
+        help="Finish mode (solo default: rebase-ff)",
+    ),
+    cleanup: bool = typer.Option(
+        True,
+        "--cleanup/--no-cleanup",
+        help="Cleanup worktree and task branch after finish",
+    ),
+    dirty_policy: str = typer.Option(
+        "refuse",
+        "--dirty-policy",
+        help="Dirty handling: refuse (default) or stash",
+    ),
+    remote: str = typer.Option(
+        "origin",
+        "--remote",
+        help="Remote name for fetch/push operations",
+    ),
+    timestamp_mode: str = typer.Option(
+        "deterministic",
+        "--timestamp-mode",
+        help="Timestamp mode: deterministic, now, or wallclock",
+    ),
+    no_repo_guard: bool = typer.Option(
+        False,
+        "--no-repo-guard",
+        help="Skip TaskX repo detection (use with caution)",
+    ),
+    manifest: bool = typer.Option(
+        False,
+        "--manifest",
+        help="Initialize manifest if missing and append this command record",
+    ),
+    rescue_patch: str | None = typer.Option(
+        None,
+        "--rescue-patch",
+        help="Write a rescue patch on guard failure (path or 'auto')",
+    ),
+) -> None:
+    """Finish a commit sequence via rebase-ff + push (+cleanup by default)."""
+    from taskx.git.finish import finish_run as finish_run_impl
+
+    selected_run: Path | None = None
+    manifest_enabled = False
+    manifest_started_at = get_manifest_timestamp("deterministic")
+    manifest_stdout: list[str] = []
+    manifest_stderr: list[str] = []
+    manifest_exit_code = 1
+
+    try:
+        manifest_started_at = get_manifest_timestamp(normalize_timestamp_mode(timestamp_mode))
+        _check_repo_guard(no_repo_guard, rescue_patch=rescue_patch)
+        selected_run = _resolve_stateful_run_dir(run, run_root, timestamp_mode).resolve()
+        manifest_enabled = _ensure_manifest_ready(
+            selected_run,
+            create_if_missing=manifest,
+            mode="ACT",
+            timestamp_mode=timestamp_mode,
+        )
+        console.print("[cyan]Finishing run...[/cyan]")
+        console.print(f"[cyan]Run directory:[/cyan] {selected_run}")
+
+        report = finish_run_impl(
+            run_dir=selected_run,
+            mode=mode,
+            cleanup=cleanup,
+            dirty_policy=dirty_policy,
+            remote=remote,
+        )
+
+        if report["status"] == "passed":
+            console.print("[green]✓ Finish completed[/green]")
+            console.print(f"[green]  Main hash: {report['verification']['local_main_hash']}[/green]")
+            console.print(
+                f"[green]  main==origin/main: {report['verification']['main_matches_remote']}[/green]"
+            )
+            console.print(f"[green]  Report: {selected_run / FINISH_FILENAME}[/green]")
+            manifest_stdout.extend(
+                [
+                    "Finish completed",
+                    f"Main hash: {report['verification']['local_main_hash']}",
+                    f"main==origin/main: {report['verification']['main_matches_remote']}",
+                ]
+            )
+            raise typer.Exit(0)
+
+        console.print("[red]✗ Finish failed[/red]")
+        manifest_stdout.append("Finish failed")
+        for error in report.get("errors", []):
+            console.print(f"[red]  • {error}[/red]")
+            manifest_stderr.append(str(error))
+        raise typer.Exit(2)
+
+    except typer.Exit as exc:
+        manifest_exit_code = int(exc.exit_code)
+        raise
+    except Exception as e:
+        manifest_stderr.append(str(e))
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(1)
+    finally:
+        _append_manifest_command(
+            enabled=manifest_enabled,
+            run_dir=selected_run,
+            timestamp_mode=timestamp_mode,
+            exit_code=manifest_exit_code,
+            started_at=manifest_started_at,
+            stdout_lines=manifest_stdout,
+            stderr_lines=manifest_stderr,
+            expected_artifacts=[FINISH_FILENAME, DIRTY_STATE_FILENAME],
         )
 
 
