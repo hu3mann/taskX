@@ -64,7 +64,7 @@ jobs:
         run: docker run --rm "${{ steps.image.outputs.name }}:${{ github.ref_name }}" --version
 
       - name: Attest container provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-name: ${{ steps.image.outputs.name }}
           subject-digest: ${{ steps.build.outputs.digest }}
