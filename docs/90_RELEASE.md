@@ -42,17 +42,13 @@ Run tests:
 uv run pytest
 ```
 
-Build artifacts:
+Build artifacts locally for verification only:
 
 ```bash
 uv build
 ```
 
-Publish:
-
-```bash
-uv publish
-```
+Do not publish from laptops or local developer machines. Publishing occurs in CI only after a release tag is pushed.
 
 If your repo uses a local release verification script, run it before tagging.
 
@@ -83,3 +79,9 @@ After pushing the tag, your GitHub Actions release workflow should:
 2. Release artifact provenance attestation is generated in CI.
 3. Container provenance attestation is generated in CI.
 4. Release remains tag-gated and fails on tag/version mismatch.
+
+## Provenance Expectations
+
+1. Release artifacts are built in CI on tag push (`vX.Y.Z`).
+2. Release hashes are generated in CI and recorded with the release artifacts.
+3. Local machines never perform direct publish operations for release artifacts.
