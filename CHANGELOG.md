@@ -8,8 +8,18 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ### Added
 
+- Governance and contribution documentation.
+
 ### Changed
+
+- N/A
 
 ### Fixed
 
-### Removed
+- N/A
+
+## [0.1.0] - 2026-02-18
+
+### Added
+
+- Initial public release baseline.

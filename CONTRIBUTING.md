@@ -1,78 +1,34 @@
-# Contributing 💅⚙️
+# Contributing
 
-Welcome to the velvet rope.
+Thank you for contributing to TaskX.
 
-If you want to make TaskX "friendlier" by adding ambiguity, retries, or silent fallback,
-this is not that party.
+## Development Setup
 
-If you want to make it sharper, more deterministic, more auditable:
-come in. 🖤
-
----
-
-## Setup 🧠
-
-We use `uv`.
+1. Install `uv`.
+2. Sync dependencies:
 
 ```bash
-uv lock
 uv sync
+```
+
+3. Run tests before opening a PR:
+
+```bash
 uv run pytest
 ```
 
-Only uv workflows are supported in this repository.
+## Pull Request Requirements
 
----
+Every PR should include a concise Proof Bundle:
 
-## Branch Discipline 🧾
+- `git status --porcelain`
+- `git diff --name-only`
+- Relevant command output that validates behavior
 
-Start clean. Stay clean.
+Keep changes scoped to the task packet. Avoid unrelated refactors.
 
-Work must be isolated in:
-- a new branch, or
-- a worktree attached to a new branch (preferred)
+## Commit and Review Expectations
 
-If you can't prove what changed, it didn't happen. 😈
-
----
-
-## Determinism Is Sacred 🔥
-
-Before you submit a PR, ask yourself:
-- Did I introduce hidden behavior?
-- Did I add fallback logic?
-- Did I sneak in a retry?
-- Did I make the kernel guess?
-- Did I touch artifact formats or schema?
-
-If yes: justify it with evidence and contract impact. 🧾🧨
-
----
-
-## PR Requirements 🖤
-
-Every PR must include:
-- scope boundary (what changed / what did not)
-- determinism impact statement
-- artifact impact statement
-- proof bundle (commands + outputs)
-- `uv run pytest` results
-
-We merge evidence.
-We reject vibes. 💋
-
----
-
-## Hard Limits 🚫
-
-TaskX will never:
-- retry automatically
-- execute multiple runners per invocation
-- persist cross-run state
-- perform undeclared network calls
-- guess user intent
-- silently mutate repositories
-
-Keep it explicit.
-Keep it observable.
-Keep it honest. 🧾
+- Use clear commit messages.
+- Keep commits small and deterministic.
+- Include risk notes for behavior changes.

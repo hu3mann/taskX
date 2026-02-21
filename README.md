@@ -9,14 +9,88 @@
 
 ## Install
 
-uv (recommended):
+[Installation](docs/INSTALL.md) • [Release Guidelines](docs/RELEASE.md) • [Contributing](CONTRIBUTING.md) • [Security Policy](SECURITY.md)
 
-```bash
-uv tool install taskx
-taskx --help
+</div>
+
+---
+
+## 🦾 What is TaskX?
+
+Imagine a task runner that doesn't trust the internet, doesn't trust your system clock, and definitely doesn't trust random file mutations. That's **TaskX**.
+
+TaskX is a rigorous system for managing the lifecycle of **"Task Packets"**—self-contained units of work. It is built for environments where "it works on my machine" is considered an admission of guilt.
+
+### 🌟 Why You'll Love It (Or Fear It)
+
+- **🔮 Deterministic Time Travel**: We mock time. Literal time. Your builds will produce the exact same artifacts today, tomorrow, and in 2050.
+- **🛡️ The Great Allowlist**: Files don't just "change." They apply for a visa. Our `AllowlistDiff` system catches unauthorized mutations before they even think about becoming a commit.
+- **🔌 Offline by Design**: TaskX assumes the internet is down. If your build needs `npm install` to run, go back to square one.
+- **🧬 Audit Trails**: Every run produces a forensic verification trail. Who ran it? When? with what inputs? It's all in the JSON.
+
+---
+
+## 🔄 The Lifecycle
+
+TaskX treats code changes as a manufacturing pipeline.
+
+```mermaid
+graph LR
+    A[Spec Mine] -->|Compile| B(Task Queue)
+    B -->|Run| C{Task Packet}
+    C -->|Execute| D[Run Workspace]
+    D -->|Collect| E[Evidence]
+    E -->|Verify| F{Compliance Gate}
+    F -->|Pass| G[Promotion Token]
+    F -->|Fail| H[Quarantine]
+    G -->|Commit| I[Git History]
+
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style C fill:#bbf,stroke:#333,stroke-width:4px
+    style G fill:#9f9,stroke:#333,stroke-width:2px
+    style H fill:#f99,stroke:#333,stroke-width:2px
 ```
 
-pip:
+1.  **Compile**: Task definitions are mined from your specs and compiled into immutable packets.
+2.  **Run**: A packet is executed in an isolated workspace.
+3.  **Gate**: The output is scanned. Did it touch a file it wasn't supposed to? **REJECTED.**
+4.  **Promote**: Only if the gate passes do you get a `PROMOTION.json` token.
+5.  **Commit**: You cannot commit without a token. (We check.)
+
+---
+
+## Deterministic Task Execution
+
+TaskX uses isolated git worktrees and commit plans to ensure:
+
+- linear `main` history
+- one packet = one commit stack
+- deterministic rebases and fast-forward merges
+- zero accidental commits on `main`
+
+See `docs/WORKTREES_COMMIT_SEQUENCING.md` for details.
+If a packet includes a `COMMIT PLAN`, execute it with `taskx commit-sequence`; manual commits can break determinism guarantees. See `docs/TASK_PACKET_FORMAT.md`.
+
+---
+
+## 🚀 Quick Start
+
+Get up and running faster than you can say "idempotency."
+
+### 1. Installation
+
+The easiest way to join the cult—err, project—is via the installer script:
+
+```bash
+# Latest stable version
+curl -fsSL https://raw.githubusercontent.com/hu3mann/taskX/main/scripts/install.sh | bash
+```
+
+*Need manual installation or wheel support? Check the [Detailed Installation Guide](docs/INSTALL.md).*
+
+### 2. The "Hello World" Loop
+
+Let's run a loop. A loop creates tasks, runs them, checks them, and promotes them.
 
 ```bash
 python -m pip install taskx
@@ -63,4 +137,3 @@ Expected outputs:
 TaskX (kernel) validates packets, plans deterministically, executes one path (or emits a manual handoff), and writes canonical artifacts.
 
 Everything else (scheduling, orchestration, memory, UX) belongs in the ecosystem above the kernel.
-

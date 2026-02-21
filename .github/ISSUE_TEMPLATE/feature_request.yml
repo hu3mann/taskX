@@ -1,26 +1,31 @@
-name: Feature Request
+name: Feature request
 description: Propose a scoped, deterministic improvement
-title: "feature: "
-labels: [enhancement]
+title: "feat: "
+labels:
+  - enhancement
 body:
   - type: textarea
     id: problem
     attributes:
       label: Problem Statement
-      description: What limitation are you trying to solve?
+      description: What user or developer problem does this solve?
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Proposal
-      description: Describe the smallest deterministic change.
+      label: Proposed Change
+      description: Describe the smallest useful change.
     validations:
       required: true
   - type: textarea
-    id: impact
+    id: alternatives
     attributes:
-      label: Determinism and Artifact Impact
-      description: Explain impact on determinism, artifacts, and policy.
+      label: Alternatives Considered
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Concrete, testable checks for completion.
     validations:
       required: true

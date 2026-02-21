@@ -1,28 +1,16 @@
 ## Summary
 
-Describe the change and why it is needed.
+Describe what changed and why.
 
-## Scope
+## Proof Bundle
 
-- [ ] Change is limited to intended files/areas
-- [ ] No unrelated refactors
-
-## Verification
-
-List exact commands run and summarize results.
-
-```bash
-uv run pytest
-```
-
-## Behavior Notes
-
-- [ ] Public contract impact documented (if applicable)
-- [ ] Docs updated (if applicable)
-- [ ] Security implications reviewed (if applicable)
+- [ ] `git status --porcelain`
+- [ ] `git diff --name-only`
+- [ ] Verification command output included
 
 ## Checklist
 
-- [ ] Conventional commit messages used
-- [ ] CI expectations reviewed
-- [ ] No secrets included
+- [ ] Scope matches task packet
+- [ ] Determinism impact described
+- [ ] Docs impact described
+- [ ] Tests added/updated if needed

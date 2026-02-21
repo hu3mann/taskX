@@ -1,50 +1,23 @@
-# Security Policy 🔐
-
-TaskX is small, strict, and deterministic by design.
-
-If you find a way to bypass validation, tamper with artifacts, or introduce nondeterminism, we want to know immediately.
-
----
+# Security Policy
 
 ## Supported Versions
 
-We support the latest minor release only.
+We provide security updates for the latest released `main` branch and the most recent tagged release.
 
-Older versions are not maintained.
-
----
+| Version | Supported |
+| --- | --- |
+| `main` | :white_check_mark: |
+| latest tag | :white_check_mark: |
+| older tags | :x: |
 
 ## Reporting a Vulnerability
 
-Please do not open public issues for security reports.
+Please report security issues privately.
 
-**How to report:**
+1. Email: `security@taskx.dev`
+2. Include a clear description of the vulnerability, impact, and reproduction steps.
+3. Share any proof-of-concept in a private channel only.
 
-Use [GitHub Security Advisories](https://github.com/hu3mann/taskX/security/advisories/new) to submit a private report.
+We will acknowledge receipt within 3 business days and provide status updates as triage progresses.
 
-**Include in your report:**
-
-- TaskX version
-- OS and Python version
-- minimal reproduction steps
-- a redacted packet (if applicable)
-- relevant artifacts or logs (redacted)
-
-We aim to respond within 72 hours.
-
-We don't posture.
-We reproduce.
-We patch cleanly.
-
----
-
-## What Counts as Security-Relevant
-
-- validation bypass
-- artifact tampering or suppression
-- exit code manipulation
-- hidden network calls
-- determinism compromise
-- runner substitution behind policy
-
-If you can make TaskX behave unpredictably, you've found something worth reporting.
+Do not open public GitHub issues for unpatched vulnerabilities.

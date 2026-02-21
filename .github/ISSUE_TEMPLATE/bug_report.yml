@@ -1,26 +1,37 @@
-name: Bug Report
-description: Report a deterministic defect in TaskX
+name: Bug report
+description: Report a reproducible bug in TaskX
 title: "bug: "
-labels: [bug]
+labels:
+  - bug
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting an issue. Please provide deterministic reproduction details.
   - type: textarea
     id: summary
     attributes:
       label: Summary
-      description: Describe the observed behavior.
+      description: What happened?
     validations:
       required: true
   - type: textarea
-    id: repro
+    id: reproduce
     attributes:
       label: Reproduction Steps
-      description: Provide deterministic steps and packet inputs.
+      description: Exact commands, inputs, and environment.
     validations:
       required: true
   - type: textarea
-    id: artifacts
+    id: expected
     attributes:
-      label: Artifacts
-      description: Paste relevant artifact paths and excerpts.
+      label: Expected Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: proof
+    attributes:
+      label: Proof Bundle
+      description: Paste command output (`git status --porcelain`, logs, traces).
     validations:
       required: true
