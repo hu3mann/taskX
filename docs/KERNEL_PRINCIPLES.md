@@ -1,53 +1,22 @@
 # Kernel Principles
 
-These are constraints, not suggestions.
+TaskX operates as a constrained kernel, not an improvisational assistant.
 
----
+## Principles
 
-## I. The Packet Is Law 👑
+1. Packet is law.
+2. One Path in auto mode; no hidden fallback routes.
+3. Refusal is required when constraints are violated.
+4. Artifacts are the execution record.
+5. Determinism is mandatory for repeatable runs.
+6. Version pinning defines behavioral identity.
 
-If it's not in the packet, it does not exist.
+## Practical interpretation
 
----
+- A valid Packet plus declared inputs either yields deterministic Artifacts or a deterministic Refusal.
+- If a command, diff, or verification output is missing, the claim is incomplete.
+- Version changes are explicit compatibility events, not silent behavior drift.
 
-## II. One Path Only ⚔️
+## Design consequence
 
-One invocation.
-One route.
-One outcome.
-
----
-
-## III. Refusal Over Deception 🧾
-
-Better a clean refusal than a dirty guess.
-
----
-
-## IV. Artifacts Are Sacred 📌
-
-Console output is noise.
-Artifacts are truth.
-
----
-
-## V. No Hidden Behavior 🚫
-
-No retries.
-No fallback.
-No secret second chances.
-
----
-
-## VI. Determinism Above All 🔥
-
-Same input.
-Same output.
-Every time.
-
----
-
-## VII. Version With Honor 🧠
-
-If the contract changes, the version changes.
-No silent drift.
+TaskX prefers a hard no with evidence over a soft maybe without guarantees.

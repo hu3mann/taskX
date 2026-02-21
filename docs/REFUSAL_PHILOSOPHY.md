@@ -1,23 +1,23 @@
-# Refusal Is Not Failure
+# Refusal Philosophy
 
-TaskX refuses before it lies.
+TaskX does not treat refusal as a failure mode. It treats refusal as an integrity boundary.
 
-Many systems:
-- retry silently
-- downgrade capability
-- swap implementations
-- guess user intent
+## Why refuse
 
-TaskX does none of this.
+When required evidence is missing, scope is violated, or policy constraints are incompatible, TaskX must refuse to continue.
 
-If a packet is invalid, TaskX refuses.
-If a runner is unavailable, TaskX refuses.
-If policy is violated, TaskX refuses.
+Proceeding anyway would break deterministic guarantees and dilute operator trust.
 
-Refusal is not weakness.
-Refusal is boundary enforcement.
+## Integrity over convenience
 
-Boundary enforcement preserves guarantees.
-Guarantees preserve trust.
+A refusal preserves auditability:
 
-Trust is the entire point.
+- the system states what is blocked
+- the system states why it is blocked
+- the system defines the smallest change needed to proceed
+
+This behavior protects the guarantee that artifacts are authoritative.
+
+## Trust model
+
+Users can trust successful outputs because the same kernel is willing to stop when guarantees cannot be preserved.

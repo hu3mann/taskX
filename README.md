@@ -7,6 +7,41 @@
 - Deterministic: identical packet + declared inputs + TaskX version yields identical outputs.
 - Single-path: no hidden retries, no fallback runners, no background execution.
 
+## Kernel Manifesto
+
+TaskX is strict by design:
+
+- one packet, one scoped objective
+- one path, or explicit refusal with evidence
+- one artifact trail that can be verified end to end
+
+The goal is operational trust, not convenience theater.
+
+## Anti-Features
+
+TaskX intentionally does not provide:
+
+- hidden retries
+- silent fallbacks to alternate runners
+- undocumented file writes
+- background mutation outside declared packet scope
+
+## Kernel FAQ
+
+**Why does TaskX refuse so often?**  
+Because refusal protects determinism and keeps artifacts trustworthy.
+
+**Why require proof bundles?**  
+Because claims without command output are not verifiable.
+
+**Why avoid background behavior?**  
+Because state changes must remain explicit, local, and auditable.
+
+## Determinism Stress Test
+
+Re-run the same packet under the same inputs and version.  
+If outputs differ, treat it as a bug and capture evidence before retrying.
+
 ## Install
 
 [Installation](docs/INSTALL.md) • [Release Guidelines](docs/RELEASE.md) • [Contributing](CONTRIBUTING.md) • [Security Policy](SECURITY.md)
