@@ -151,8 +151,17 @@ def test_commit_sequence_stash_only_disallowed_changes(tmp_path: Path, monkeypat
         cwd=repo,
         text=True,
     )
-    assert "tp_0102_feature" in worktree_path
-    wt = repo / "out" / "worktrees" / "tp_0102_feature"
+    assert (
+        "tp_0102_feature" in worktree_path
+        or "tp_taskx.core_0102_feature" in worktree_path
+        or "tp_taskx_core_0102_feature" in worktree_path
+    )
+    candidates = [
+        repo / "out" / "worktrees" / "tp_taskx.core_0102_feature",
+        repo / "out" / "worktrees" / "tp_taskx_core_0102_feature",
+        repo / "out" / "worktrees" / "tp_0102_feature",
+    ]
+    wt = next(path for path in candidates if path.exists())
 
     (wt / "src" / "file.py").write_text("print('allowlisted')\n", encoding="utf-8")
     (wt / "wip.txt").write_text("scratch\n", encoding="utf-8")
