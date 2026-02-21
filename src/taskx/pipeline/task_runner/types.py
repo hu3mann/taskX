@@ -6,13 +6,14 @@ from dataclasses import dataclass
 
 
 @dataclass
-<<<<<<< Updated upstream
 class ProjectIdentity:
     """Task packet project identity declaration."""
 
     project_id: str
     intended_repo: str | None = None
-=======
+
+
+@dataclass
 class CommitStep:
     """Single commit step from optional COMMIT PLAN section."""
 
@@ -20,7 +21,6 @@ class CommitStep:
     message: str
     allowlist: list[str]
     verify: list[str] | None
->>>>>>> Stashed changes
 
 
 @dataclass

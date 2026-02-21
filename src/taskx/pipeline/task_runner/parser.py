@@ -7,14 +7,11 @@ import json
 import re
 from typing import TYPE_CHECKING
 
-<<<<<<< Updated upstream
 from taskx.pipeline.task_runner.types import (
+    CommitStep,
     ProjectIdentity,
     TaskPacketInfo,
 )
-=======
-from taskx.pipeline.task_runner.types import CommitStep, TaskPacketInfo
->>>>>>> Stashed changes
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -249,7 +246,6 @@ def _extract_sources(section_content: str) -> list[str]:
     return sources
 
 
-<<<<<<< Updated upstream
 def _extract_project_identity(section_content: str | None) -> ProjectIdentity | None:
     """Parse optional PROJECT IDENTITY section key/value pairs."""
     if section_content is None:
@@ -295,7 +291,8 @@ def _assert_project_identity_header(
             "ERROR: Task Packet missing required PROJECT IDENTITY header.\n"
             "Refusing to run."
         )
-=======
+
+
 def _extract_commit_plan(
     section_content: str | None,
     *,
@@ -391,4 +388,3 @@ def _extract_commit_plan(
         )
 
     return steps
->>>>>>> Stashed changes
