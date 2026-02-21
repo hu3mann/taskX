@@ -148,16 +148,22 @@ Everything else (scheduling, orchestration, memory, UX) belongs in the ecosystem
 
 ## Badge wall
 
-- Deterministic: VERBATIM_REQUIRED
-- Implicit Retries: VERBATIM_REQUIRED
-- Silent Fallbacks: VERBATIM_REQUIRED
-- Cross-Run State: VERBATIM_REQUIRED
-- Multi-Runner: VERBATIM_REQUIRED
-- Ghost Behavior: VERBATIM_REQUIRED
+- Deterministic: identical packet + declared inputs + TaskX version yields identical outputs.
+- Implicit Retries: no hidden retries.
+- Silent Fallbacks: no fallback runners.
+- Cross-Run State: no cross-run mutable state.
+- Multi-Runner: one path only (single-path execution).
+- Ghost Behavior: if it did not write an artifact, it did not happen.
 
 ## Kernel Manifesto
 
-VERBATIM_REQUIRED
+TaskX is strict by design:
+
+- one packet, one scoped objective
+- one path, or explicit refusal with evidence
+- one artifact trail that can be verified end to end
+
+The goal is operational trust, not convenience theater.
 
 ## Anti-Features
 
@@ -175,7 +181,14 @@ If you want flexibility, build it above the kernel.
 
 ## Kernel FAQ
 
-VERBATIM_REQUIRED
+**Why does TaskX refuse so often?**  
+Because refusal protects determinism and keeps artifacts trustworthy.
+
+**Why require proof bundles?**  
+Because claims without command output are not verifiable.
+
+**Why avoid background behavior?**  
+Because state changes must remain explicit, local, and auditable.
 
 ## Determinism Stress Test
 
@@ -195,4 +208,7 @@ the contract has been violated.
 
 ## Why TaskX Is Hot
 
-VERBATIM_REQUIRED
+- **🔮 Deterministic Time Travel**: We mock time. Literal time. Your builds will produce the exact same artifacts today, tomorrow, and in 2050.
+- **🛡️ The Great Allowlist**: Files don't just "change." They apply for a visa. Our `AllowlistDiff` system catches unauthorized mutations before they even think about becoming a commit.
+- **🔌 Offline by Design**: TaskX assumes the internet is down. If your build needs `npm install` to run, go back to square one.
+- **🧬 Audit Trails**: Every run produces a forensic verification trail. Who ran it? When? with what inputs? It's all in the JSON.
