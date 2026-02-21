@@ -28,6 +28,14 @@ from taskx.manifest import (
 from taskx.manifest import (
     get_timestamp as get_manifest_timestamp,
 )
+from taskx.metrics import (
+    load_metrics,
+    metrics_env_enabled,
+    record_cli_invocation,
+    reset_metrics,
+    resolve_metrics_path,
+    set_metrics_enabled,
+)
 from taskx.obs.run_artifacts import (
     COMMIT_RUN_FILENAME,
     PROMOTION_LEGACY_FILENAME,
@@ -139,6 +147,7 @@ class BannerTyperGroup(TyperGroup):
 
     def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         """Format help with optional banner prepended."""
+        _record_metrics_best_effort()
         if should_show_banner(sys.argv):
             from typer.rich_utils import _get_rich_console
             _get_rich_console()
@@ -159,6 +168,8 @@ console = Console()
 
 neon_app = typer.Typer(help="Neon terminal cosmetics (console-only). Artifacts stay sterile.")
 cli.add_typer(neon_app, name="neon")
+metrics_app = typer.Typer(help="Local-only opt-in usage metrics (no telemetry).")
+cli.add_typer(metrics_app, name="metrics")
 
 
 def _use_compat_options(*_values: object) -> None:
@@ -181,6 +192,7 @@ class FinishMode(StrEnum):
 def _version_option_callback(value: bool) -> None:
     """Handle eager --version option."""
     if value:
+        _record_metrics_best_effort()
         if should_show_banner(sys.argv):
             render_banner()
         typer.echo(__version__)
@@ -204,9 +216,23 @@ def _cli_callback(
     Checks for import shadowing issues and emits warnings.
     """
     _ = version
+    _record_metrics_best_effort()
     # Skip shadowing check for print-runtime-origin command
     if ctx.invoked_subcommand != "print-runtime-origin":
         _check_import_shadowing()
+
+
+def _record_metrics_best_effort() -> None:
+    """Record invocation counts without impacting normal command execution."""
+    try:
+        metrics_path = resolve_metrics_path(env=os.environ, home=Path.home())
+        _ = record_cli_invocation(
+            argv=sys.argv,
+            path=metrics_path,
+            env=os.environ,
+        )
+    except OSError as exc:
+        typer.echo(f"Warning: unable to persist metrics: {exc}", err=True)
 
 
 def _check_import_shadowing() -> None:
@@ -432,6 +458,57 @@ def neon_persist(
             neon_console.print(f"[cyan]Backup:[/cyan] {result.backup_path}")
         else:
             print(f"Backup: {result.backup_path}")
+
+
+@metrics_app.command("status")
+def metrics_status() -> None:
+    """Show local metrics enablement status."""
+    path = resolve_metrics_path(env=os.environ, home=Path.home())
+    payload = load_metrics(path)
+
+    env_enabled = metrics_env_enabled(os.environ)
+    persistent_enabled = bool(payload.get("enabled", False))
+    effective_enabled = env_enabled or persistent_enabled
+    commands = payload.get("commands")
+    commands_tracked = len(commands) if isinstance(commands, dict) else 0
+
+    typer.echo(f"path={path}")
+    typer.echo(f"env_enabled={int(env_enabled)}")
+    typer.echo(f"persistent_enabled={int(persistent_enabled)}")
+    typer.echo(f"effective_enabled={int(effective_enabled)}")
+    typer.echo(f"commands_tracked={commands_tracked}")
+
+
+@metrics_app.command("enable")
+def metrics_enable() -> None:
+    """Persistently enable local metrics collection."""
+    path = resolve_metrics_path(env=os.environ, home=Path.home())
+    _ = set_metrics_enabled(path, True)
+    typer.echo("metrics_enabled=1")
+
+
+@metrics_app.command("disable")
+def metrics_disable() -> None:
+    """Persistently disable local metrics collection."""
+    path = resolve_metrics_path(env=os.environ, home=Path.home())
+    _ = set_metrics_enabled(path, False)
+    typer.echo("metrics_enabled=0")
+
+
+@metrics_app.command("show")
+def metrics_show() -> None:
+    """Display the local metrics payload."""
+    path = resolve_metrics_path(env=os.environ, home=Path.home())
+    payload = load_metrics(path)
+    typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+
+
+@metrics_app.command("reset")
+def metrics_reset() -> None:
+    """Reset local metrics counters."""
+    path = resolve_metrics_path(env=os.environ, home=Path.home())
+    _ = reset_metrics(path)
+    typer.echo("metrics_commands_reset=1")
 
 
 def _check_repo_guard(bypass: bool, rescue_patch: str | None = None) -> Path:
