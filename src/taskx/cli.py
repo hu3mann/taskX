@@ -145,6 +145,10 @@ try:
     from taskx.ops.tp_git.cli import app as tp_git_app
 except ImportError:
     tp_git_app = None  # type: ignore
+try:
+    from taskx.ops.tp_run.cli import register as register_tp_run
+except ImportError:
+    register_tp_run = None  # type: ignore
 
 
 class BannerTyperGroup(TyperGroup):
@@ -179,6 +183,8 @@ tp_app = typer.Typer(name="tp", help="Task Packet workflow commands", no_args_is
 cli.add_typer(tp_app, name="tp")
 if tp_git_app:
     tp_app.add_typer(tp_git_app, name="git")
+if register_tp_run:
+    register_tp_run(tp_app)
 
 
 def _use_compat_options(*_values: object) -> None:
