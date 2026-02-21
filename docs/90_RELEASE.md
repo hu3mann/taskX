@@ -76,3 +76,10 @@ After pushing the tag, your GitHub Actions release workflow should:
 3. Build sdist and wheel
 4. Smoke test install and `taskx --help`
 5. Publish artifacts
+
+## Security & Provenance Gates
+
+1. Dependency scan must pass (`pip-audit --strict`) in CI.
+2. Release artifact provenance attestation is generated in CI.
+3. Container provenance attestation is generated in CI.
+4. Release remains tag-gated and fails on tag/version mismatch.

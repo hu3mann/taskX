@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  attestations: write
 
 jobs:
   pypi-release:
@@ -50,6 +51,11 @@ jobs:
 
       - name: Build artifacts
         run: uv build
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "dist/*"
 
       - name: Verify wheel installation
         run: |
