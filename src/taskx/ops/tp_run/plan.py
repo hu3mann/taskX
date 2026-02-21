@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 from taskx.ops.tp_git.exec import run_git
-from taskx.ops.tp_git.git_worktree import start_tp
+from taskx.ops.tp_git.git_worktree import cleanup_tp, start_tp, sync_main
 from taskx.ops.tp_git.github import merge_pr, pr_create, pr_status
 from taskx.ops.tp_git.guards import run_doctor
 from taskx.ops.tp_git.naming import build_worktree_path, normalize_slug, resolve_target
@@ -303,11 +303,68 @@ def execute_run(options: RunOptions, writer: ProofWriter) -> RunResult:
                 merged_confirmed=False,
             )
 
+    if not merged_confirmed:
+        writer.write_json(
+            "EXIT.json",
+            {
+                "exit_code": 1,
+                "reason": "merge not confirmed; sync-main and cleanup skipped",
+                "stage": "merge-check",
+                "run_id": options.run_id,
+            },
+        )
+        return RunResult(
+            exit_code=1,
+            message="merge not confirmed; run with --wait-merge or complete merge manually",
+            branch=branch,
+            worktree_path=worktree_path,
+            merged_confirmed=False,
+        )
+
+    sync_payload = sync_main(repo=repo_root)
+    writer.write_text(
+        "SYNC_MAIN.txt",
+        (
+            f"repo_root={sync_payload['repo_root']}\n"
+            f"fetch={sync_payload['fetch']}\n"
+            f"pull={sync_payload['pull']}\n"
+        ),
+    )
+    if options.stop_after == "sync":
+        writer.write_json("EXIT.json", {"exit_code": 0, "reason": "stopped after sync", "run_id": options.run_id})
+        return RunResult(
+            exit_code=0,
+            message="stopped after sync",
+            branch=branch,
+            worktree_path=worktree_path,
+            merged_confirmed=True,
+        )
+
+    cleanup_payload = cleanup_tp(tp_id=options.tp_id, repo=repo_root)
+    writer.write_text(
+        "CLEANUP.txt",
+        (
+            f"repo_root={cleanup_payload['repo_root']}\n"
+            f"worktree_path={cleanup_payload['worktree_path']}\n"
+            f"remove={cleanup_payload['remove']}\n"
+            f"prune={cleanup_payload['prune']}\n"
+        ),
+    )
+    if options.stop_after == "cleanup":
+        writer.write_json("EXIT.json", {"exit_code": 0, "reason": "stopped after cleanup", "run_id": options.run_id})
+        return RunResult(
+            exit_code=0,
+            message="stopped after cleanup",
+            branch=branch,
+            worktree_path=Path(cleanup_payload["worktree_path"]),
+            merged_confirmed=True,
+        )
+
     writer.write_json(
         "EXIT.json",
         {
             "exit_code": 0,
-            "reason": "start complete; continue with --continue or tp git pr/merge",
+            "reason": "run completed",
             "run_id": options.run_id,
         },
     )
