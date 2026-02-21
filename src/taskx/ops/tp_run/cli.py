@@ -32,6 +32,12 @@ def register(tp_app: typer.Typer) -> None:
             "--test-cmd",
             help="Optional test command to run inside TP worktree (example: 'pytest -q').",
         ),
+        pr_title: str | None = typer.Option(None, "--pr-title", help="Pull request title override."),
+        pr_body: str | None = typer.Option(None, "--pr-body", help="Pull request body override."),
+        pr_body_file: Path | None = typer.Option(None, "--pr-body-file", help="Pull request body file path."),
+        wait_merge: bool = typer.Option(False, "--wait-merge", help="Wait for merged PR state."),
+        wait_timeout_sec: int = typer.Option(900, "--wait-timeout-sec", help="Wait timeout in seconds."),
+        merge_enabled: bool = typer.Option(True, "--merge/--no-merge", help="Attempt merge after PR creation."),
     ) -> None:
         """Run complete TP lifecycle (scaffold; writes deterministic proof pack)."""
         try:
@@ -68,6 +74,9 @@ def register(tp_app: typer.Typer) -> None:
         if stop_after not in {None, "doctor", "start", "test", "pr", "merge", "sync", "cleanup"}:
             typer.echo("invalid --stop-after value", err=True)
             raise typer.Exit(1)
+        if pr_body is not None and pr_body_file is not None:
+            typer.echo("pass either --pr-body or --pr-body-file, not both", err=True)
+            raise typer.Exit(1)
 
         result = execute_run(
             RunOptions(
@@ -78,6 +87,12 @@ def register(tp_app: typer.Typer) -> None:
                 continue_mode=continue_mode,
                 stop_after=stop_after,  # type: ignore[arg-type]
                 test_cmd=test_cmd,
+                pr_title=pr_title,
+                pr_body=pr_body,
+                pr_body_file=pr_body_file,
+                wait_merge=wait_merge,
+                wait_timeout_sec=wait_timeout_sec,
+                merge_enabled=merge_enabled,
             ),
             writer,
         )

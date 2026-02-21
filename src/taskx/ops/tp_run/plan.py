@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shlex
 import subprocess
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Literal
 
 from taskx.ops.tp_git.exec import run_git
 from taskx.ops.tp_git.git_worktree import start_tp
+from taskx.ops.tp_git.github import merge_pr, pr_create, pr_status
 from taskx.ops.tp_git.guards import run_doctor
 from taskx.ops.tp_git.naming import build_worktree_path, normalize_slug, resolve_target
 from taskx.ops.tp_run.proof import ProofWriter
@@ -29,6 +31,12 @@ class RunOptions:
     continue_mode: bool = False
     stop_after: StopAfter | None = None
     test_cmd: str | None = None
+    pr_title: str | None = None
+    pr_body: str | None = None
+    pr_body_file: Path | None = None
+    wait_merge: bool = False
+    wait_timeout_sec: int = 900
+    merge_enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -39,6 +47,7 @@ class RunResult:
     message: str
     branch: str | None
     worktree_path: Path | None
+    merged_confirmed: bool = False
 
 
 def _capture_precheck(repo_root: Path) -> str:
@@ -211,6 +220,89 @@ def execute_run(options: RunOptions, writer: ProofWriter) -> RunResult:
             writer.write_json("EXIT.json", {"exit_code": 0, "reason": "stopped after test", "run_id": options.run_id})
             return RunResult(exit_code=0, message="stopped after test", branch=branch, worktree_path=worktree_path)
 
+    title = options.pr_title or f"{options.tp_id}: {normalized_slug}"
+    body = options.pr_body or (
+        "Automated TaskX TP run.\n\n"
+        f"- run_id: {options.run_id}\n"
+        f"- proof_dir: {writer.paths.run_dir}\n"
+        "- checklist: tests passed, PR opened by taskx tp run\n"
+    )
+    try:
+        pr_payload = pr_create(
+            tp_id=options.tp_id,
+            title=title,
+            body=body if options.pr_body_file is None else None,
+            body_file=options.pr_body_file,
+            repo=repo_root,
+        )
+    except RuntimeError as exc:
+        writer.write_json(
+            "EXIT.json",
+            {"exit_code": 1, "reason": str(exc), "stage": "pr", "run_id": options.run_id},
+        )
+        return RunResult(exit_code=1, message=str(exc), branch=branch, worktree_path=worktree_path)
+
+    writer.write_json("PR.json", pr_payload)
+    if options.stop_after == "pr":
+        writer.write_json("EXIT.json", {"exit_code": 0, "reason": "stopped after pr", "run_id": options.run_id})
+        return RunResult(exit_code=0, message="stopped after pr", branch=branch, worktree_path=worktree_path)
+
+    merged_confirmed = str(pr_payload.get("state", "")).upper() == "MERGED"
+    merge_payload: dict[str, object] | None = None
+    if options.merge_enabled:
+        try:
+            merge_payload = merge_pr(tp_id=options.tp_id, mode="squash", repo=repo_root)
+        except RuntimeError as exc:
+            writer.write_json(
+                "EXIT.json",
+                {"exit_code": 1, "reason": str(exc), "stage": "merge", "run_id": options.run_id},
+            )
+            writer.write_json("MERGE.json", {"error": str(exc), "run_id": options.run_id})
+            return RunResult(exit_code=1, message=str(exc), branch=branch, worktree_path=worktree_path)
+
+        writer.write_json("MERGE.json", merge_payload)
+        merged_confirmed = str(merge_payload.get("state", "")).upper() == "MERGED"
+        if options.stop_after == "merge":
+            writer.write_json("EXIT.json", {"exit_code": 0, "reason": "stopped after merge", "run_id": options.run_id})
+            return RunResult(
+                exit_code=0,
+                message="stopped after merge",
+                branch=branch,
+                worktree_path=worktree_path,
+                merged_confirmed=merged_confirmed,
+            )
+
+    if options.wait_merge:
+        deadline = time.time() + options.wait_timeout_sec
+        while time.time() < deadline:
+            status_payload = pr_status(tp_id=options.tp_id, repo=repo_root)
+            pr_obj = status_payload.get("pr")
+            if isinstance(pr_obj, dict):
+                state = str(pr_obj.get("state", "")).upper()
+                writer.write_json("PR.json", pr_obj)
+                if state == "MERGED":
+                    merged_confirmed = True
+                    break
+            time.sleep(5)
+
+        if not merged_confirmed:
+            writer.write_json(
+                "EXIT.json",
+                {
+                    "exit_code": 1,
+                    "reason": "wait-merge timed out before merged state",
+                    "stage": "wait",
+                    "run_id": options.run_id,
+                },
+            )
+            return RunResult(
+                exit_code=1,
+                message="wait-merge timed out before merged state",
+                branch=branch,
+                worktree_path=worktree_path,
+                merged_confirmed=False,
+            )
+
     writer.write_json(
         "EXIT.json",
         {
@@ -224,4 +316,5 @@ def execute_run(options: RunOptions, writer: ProofWriter) -> RunResult:
         message=banner,
         branch=branch,
         worktree_path=worktree_path,
+        merged_confirmed=merged_confirmed,
     )
