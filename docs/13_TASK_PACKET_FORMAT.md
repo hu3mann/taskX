@@ -56,3 +56,14 @@ Some repositories may require this header (see project identity rails).
 - Additive changes to the packet format should be backward-compatible.
 - Contract-breaking changes require a major version bump of TaskX.
 
+## Git Workflow
+
+Task Packet execution must use the dedicated TP git workflow commands:
+
+1. `taskx tp git doctor`
+2. `taskx tp git start <TP_ID> <slug>`
+3. Implement in `.worktrees/<TP_ID>`
+4. `taskx tp git pr <TP_ID> --title "..."`
+5. `taskx tp git merge <TP_ID>`
+6. `taskx tp git sync-main`
+7. `taskx tp git cleanup <TP_ID>`
