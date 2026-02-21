@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 
 from taskx.ops.tp_git.guards import run_doctor
+from taskx.ops.tp_git.git_worktree import start_tp
 
 app = typer.Typer(
     name="git",
@@ -45,10 +46,30 @@ def doctor(
 def start(
     tp_id: str = typer.Argument(..., metavar="TP_ID"),
     slug: str = typer.Argument(...),
+    repo: Path | None = typer.Option(
+        None,
+        "--repo",
+        help="Repository path (defaults to current working directory).",
+    ),
+    reuse: bool = typer.Option(
+        False,
+        "--reuse",
+        help="Reuse existing TP worktree only when branch and clean state match.",
+    ),
 ) -> None:
-    """Create deterministic TP branch + worktree (implemented in later commit)."""
-    _ = (tp_id, slug)
-    typer.echo("taskx tp git start: TODO")
+    """Create deterministic TP branch + worktree from clean main."""
+    try:
+        result = start_tp(tp_id=tp_id, slug=slug, repo=repo, reuse=reuse)
+    except RuntimeError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    typer.echo(f"repo_root={result.doctor.repo_root}")
+    typer.echo(f"tp_id={tp_id}")
+    typer.echo(f"branch={result.branch}")
+    typer.echo(f"worktree_path={result.worktree_path}")
+    typer.echo(f"reused={str(result.reused).lower()}")
+    typer.echo(f"next=cd {result.worktree_path}")
 
 
 @app.command("status")
