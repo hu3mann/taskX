@@ -88,6 +88,15 @@ def _load_dirty_state(run_dir: Path) -> list[dict]:
     return payload
 
 
+def _resolve_worktree_dir(repo: Path, *names: str) -> Path:
+    """Return the first existing worktree path among known naming variants."""
+    for name in names:
+        candidate = repo / "out" / "worktrees" / name
+        if candidate.exists():
+            return candidate
+    raise AssertionError(f"No worktree directory found for any of: {names}")
+
+
 def test_wt_start_stash_logs_repo_root_dirt(tmp_path: Path, monkeypatch) -> None:
     """wt start should stash root dirt and write DIRTY_STATE entry."""
     repo, _ = _init_repo_with_origin(tmp_path)
@@ -156,12 +165,12 @@ def test_commit_sequence_stash_only_disallowed_changes(tmp_path: Path, monkeypat
         or "tp_taskx.core_0102_feature" in worktree_path
         or "tp_taskx_core_0102_feature" in worktree_path
     )
-    candidates = [
-        repo / "out" / "worktrees" / "tp_taskx.core_0102_feature",
-        repo / "out" / "worktrees" / "tp_taskx_core_0102_feature",
-        repo / "out" / "worktrees" / "tp_0102_feature",
-    ]
-    wt = next(path for path in candidates if path.exists())
+    wt = _resolve_worktree_dir(
+        repo,
+        "tp_taskx.core_0102_feature",
+        "tp_taskx_core_0102_feature",
+        "tp_0102_feature",
+    )
 
     (wt / "src" / "file.py").write_text("print('allowlisted')\n", encoding="utf-8")
     (wt / "wip.txt").write_text("scratch\n", encoding="utf-8")
@@ -203,7 +212,12 @@ def test_finish_stash_cleans_up_and_appends_dirty_state(tmp_path: Path, monkeypa
     monkeypatch.chdir(repo)
     assert runner.invoke(cli, ["wt", "start", "--run", str(run_dir), "--branch", "tp/taskx.core/0103-feature"]).exit_code == 0
 
-    wt = repo / "out" / "worktrees" / "tp_0103_feature"
+    wt = _resolve_worktree_dir(
+        repo,
+        "tp_taskx.core_0103_feature",
+        "tp_taskx_core_0103_feature",
+        "tp_0103_feature",
+    )
     (wt / "src" / "file.py").write_text("print('commit me')\n", encoding="utf-8")
     monkeypatch.chdir(wt)
     assert (
@@ -254,7 +268,12 @@ def test_dirty_state_is_append_only_across_stash_phases(tmp_path: Path, monkeypa
     preserved = json.dumps(entries_before[0], sort_keys=True)
 
     # Phase 2: stash at finish (worktree dirt).
-    wt = repo / "out" / "worktrees" / "tp_0104_feature"
+    wt = _resolve_worktree_dir(
+        repo,
+        "tp_taskx.core_0104_feature",
+        "tp_taskx_core_0104_feature",
+        "tp_0104_feature",
+    )
     (wt / "scratch.txt").write_text("dirty worktree\n", encoding="utf-8")
     monkeypatch.chdir(wt)
     assert (
@@ -282,7 +301,12 @@ def test_finish_refuses_when_main_not_fast_forwardable(tmp_path: Path, monkeypat
     monkeypatch.chdir(repo)
     assert runner.invoke(cli, ["wt", "start", "--run", str(run_dir), "--branch", "tp/taskx.core/0105-feature"]).exit_code == 0
 
-    wt = repo / "out" / "worktrees" / "tp_0105_feature"
+    wt = _resolve_worktree_dir(
+        repo,
+        "tp_taskx.core_0105_feature",
+        "tp_taskx_core_0105_feature",
+        "tp_0105_feature",
+    )
     (wt / "src" / "file.py").write_text("print('branch change')\n", encoding="utf-8")
     monkeypatch.chdir(wt)
     assert (
