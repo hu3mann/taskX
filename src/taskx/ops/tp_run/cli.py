@@ -27,6 +27,11 @@ def register(tp_app: typer.Typer) -> None:
             "--stop-after",
             help="Stop after a stage: doctor|start|test|pr|merge|sync|cleanup.",
         ),
+        test_cmd: str | None = typer.Option(
+            None,
+            "--test-cmd",
+            help="Optional test command to run inside TP worktree (example: 'pytest -q').",
+        ),
     ) -> None:
         """Run complete TP lifecycle (scaffold; writes deterministic proof pack)."""
         try:
@@ -72,6 +77,7 @@ def register(tp_app: typer.Typer) -> None:
                 run_id=run_id,
                 continue_mode=continue_mode,
                 stop_after=stop_after,  # type: ignore[arg-type]
+                test_cmd=test_cmd,
             ),
             writer,
         )

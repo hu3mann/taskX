@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shlex
+import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,6 +28,7 @@ class RunOptions:
     run_id: str
     continue_mode: bool = False
     stop_after: StopAfter | None = None
+    test_cmd: str | None = None
 
 
 @dataclass(frozen=True)
@@ -177,6 +180,36 @@ def execute_run(options: RunOptions, writer: ProofWriter) -> RunResult:
     if options.stop_after == "start":
         writer.write_json("EXIT.json", {"exit_code": 0, "reason": "stopped after start", "run_id": options.run_id})
         return RunResult(exit_code=0, message=banner, branch=branch, worktree_path=worktree_path)
+
+    if options.test_cmd:
+        argv = shlex.split(options.test_cmd)
+        completed = subprocess.run(argv, cwd=worktree_path, capture_output=True, text=True, check=False)
+        tests_log = (
+            f"$ {options.test_cmd}\n"
+            f"{completed.stdout}"
+            f"{completed.stderr}"
+            f"\n[exit={completed.returncode}]\n"
+        )
+        writer.write_text("TESTS.txt", tests_log)
+        if completed.returncode != 0:
+            writer.write_json(
+                "EXIT.json",
+                {
+                    "exit_code": completed.returncode,
+                    "reason": "test command failed",
+                    "stage": "test",
+                    "run_id": options.run_id,
+                },
+            )
+            return RunResult(
+                exit_code=completed.returncode,
+                message="test command failed",
+                branch=branch,
+                worktree_path=worktree_path,
+            )
+        if options.stop_after == "test":
+            writer.write_json("EXIT.json", {"exit_code": 0, "reason": "stopped after test", "run_id": options.run_id})
+            return RunResult(exit_code=0, message="stopped after test", branch=branch, worktree_path=worktree_path)
 
     writer.write_json(
         "EXIT.json",
